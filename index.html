@@ -1,218 +1,215 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-
 <meta charset="UTF-8">
-
-<meta
-name="viewport"
-content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 
 <title>🦆 Duck Arcade</title>
 
 <style>
 
 *{
-margin:0;
-padding:0;
-box-sizing:border-box;
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
 }
 
 html,body{
-
-width:100%;
-height:100%;
-
-overflow:hidden;
-
-font-family:
-"Noto Sans TC",
-sans-serif;
-
-background:#f7f6f2;
+    width:100%;
+    height:100%;
+    overflow:hidden;
+    font-family:"Noto Sans TC",sans-serif;
+    background:#f6f5f0;
 }
 
-/* =====================
-首頁
-===================== */
+/* ========= 首頁 ========= */
 
 #home{
 
-position:fixed;
+    position:fixed;
+    inset:0;
 
-inset:0;
+    display:flex;
 
-display:flex;
+    flex-direction:column;
 
-flex-direction:column;
+    justify-content:center;
+    align-items:center;
 
-justify-content:center;
+    background:#f6f5f0;
 
-align-items:center;
-
-background:#f7f6f2;
+    overflow:hidden;
 }
-
-/* =====================
-標題
-===================== */
 
 .logo{
 
-font-size:3rem;
+    font-size:2.8rem;
+    font-weight:900;
 
-font-weight:900;
+    color:#333;
 
-color:#333;
+    margin-bottom:10px;
 
-margin-bottom:10px;
+    z-index:10;
 }
 
 .subtitle{
 
-color:#777;
+    color:#777;
 
-margin-bottom:35px;
+    margin-bottom:35px;
+
+    z-index:10;
 }
 
-/* =====================
-按鈕
-===================== */
+/* ========= 選單 ========= */
 
 .menu{
 
-width:min(90vw,420px);
+    width:min(90vw,420px);
 
-display:flex;
+    display:flex;
+    flex-direction:column;
 
-flex-direction:column;
+    gap:14px;
 
-gap:14px;
-
-z-index:20;
+    z-index:20;
 }
 
 .game-btn{
 
-border:none;
+    border:none;
 
-background:white;
+    background:white;
 
-padding:18px;
+    padding:18px;
 
-font-size:18px;
+    border-radius:18px;
 
-font-weight:700;
+    font-size:18px;
 
-border-radius:18px;
+    font-weight:700;
 
-cursor:pointer;
+    cursor:pointer;
 
-box-shadow:
-0 5px 20px rgba(0,0,0,.08);
+    box-shadow:
+        0 5px 20px rgba(0,0,0,.08);
 
-transition:.25s;
+    transition:.25s;
 }
 
 .game-btn:hover{
 
-transform:translateY(-2px);
+    transform:translateY(-2px);
 }
 
-/* =====================
-鴨子
-===================== */
+/* ========= 鴨子 ========= */
 
 #duck{
 
-position:absolute;
+    position:absolute;
 
-width:80px;
-height:80px;
+    width:82px;
+    height:82px;
 
-left:50px;
-top:80px;
+    left:50px;
+    top:60px;
 
-z-index:1;
+    z-index:1;
 
-transition:
-left 6s linear,
-top 6s linear,
-transform .2s;
+    transition:
+        left 6s linear,
+        top 6s linear,
+        transform .2s;
 }
 
-/* =====================
-遊戲畫面
-===================== */
+/* ========= 遊戲區 ========= */
 
 #gameScreen{
 
-position:fixed;
+    position:fixed;
+    inset:0;
 
-inset:0;
+    display:none;
 
-display:none;
-
-background:white;
+    background:#fff;
 }
-
-/* iframe */
 
 #gameFrame{
 
-width:100%;
+    width:100%;
+    height:100%;
 
-height:100%;
-
-border:none;
+    border:none;
 }
 
-/* =====================
-Home按鈕
-===================== */
+/* ========= Home按鈕 ========= */
 
 #homeBtn{
 
-position:fixed;
+    position:fixed;
 
-top:12px;
-right:12px;
+    right:4px;
+    top:50%;
 
-width:52px;
-height:52px;
+    transform:translateY(-50%);
 
-border:none;
+    width:28px;
+    height:76px;
 
-border-radius:50%;
+    border:none;
 
-background:
-rgba(255,255,255,.92);
+    border-radius:14px;
 
-backdrop-filter:blur(10px);
+    background:
+    rgba(255,255,255,.55);
 
-cursor:pointer;
+    backdrop-filter:blur(10px);
 
-font-size:24px;
+    cursor:pointer;
 
-z-index:99999;
+    z-index:999999;
 
-box-shadow:
-0 4px 14px rgba(0,0,0,.18);
+    font-size:12px;
 
-display:none;
+    font-weight:700;
+
+    box-shadow:
+      0 2px 8px rgba(0,0,0,.15);
+
+    display:none;
+
+    opacity:.35;
+
+    transition:.2s;
 }
 
-/* 手機 */
+#homeBtn:hover{
+
+    opacity:1;
+}
+
+#homeBtn:active{
+
+    transform:
+      translateY(-50%)
+      scale(.95);
+}
+
+/* ========= 手機 ========= */
 
 @media(max-width:768px){
 
 .logo{
-font-size:2.2rem;
+
+    font-size:2rem;
 }
 
 .game-btn{
-font-size:16px;
-padding:16px;
+
+    font-size:16px;
+
+    padding:16px;
 }
 
 }
@@ -222,209 +219,214 @@ padding:16px;
 
 <body>
 
-<!-- =====================
+<!-- =======================
 首頁
-===================== -->
+======================= -->
 
 <div id="home">
 
-<div id="duck">
+    <div id="duck">
 
-<svg viewBox="0 0 100 100">
+        <svg viewBox="0 0 100 100">
 
-<ellipse
-cx="52"
-cy="55"
-rx="28"
-ry="20"
-fill="#FFD54F"/>
+            <ellipse
+                cx="52"
+                cy="55"
+                rx="28"
+                ry="20"
+                fill="#FFD54F"/>
 
-<circle
-cx="40"
-cy="35"
-r="15"
-fill="#FFD54F"/>
+            <circle
+                cx="40"
+                cy="35"
+                r="15"
+                fill="#FFD54F"/>
 
-<ellipse
-cx="27"
-cy="35"
-rx="8"
-ry="5"
-fill="#FF9800"/>
+            <ellipse
+                cx="27"
+                cy="35"
+                rx="8"
+                ry="5"
+                fill="#FF9800"/>
 
-<circle
-cx="43"
-cy="33"
-r="2.5"
-fill="#222"/>
+            <circle
+                cx="44"
+                cy="33"
+                r="2.5"
+                fill="#222"/>
 
-<line
-x1="50"
-y1="73"
-x2="46"
-y2="84"
-stroke="#ff9800"
-stroke-width="3"/>
+            <line
+                x1="50"
+                y1="74"
+                x2="46"
+                y2="84"
+                stroke="#ff9800"
+                stroke-width="3"/>
 
-<line
-x1="58"
-y1="73"
-x2="62"
-y2="84"
-stroke="#ff9800"
-stroke-width="3"/>
+            <line
+                x1="58"
+                y1="74"
+                x2="62"
+                y2="84"
+                stroke="#ff9800"
+                stroke-width="3"/>
 
-</svg>
+        </svg>
+
+    </div>
+
+    <div class="logo">
+
+        🦆 Duck Arcade
+
+    </div>
+
+    <div class="subtitle">
+
+        遊戲中心
+
+    </div>
+
+    <div class="menu">
+
+        <button
+            class="game-btn"
+            onclick="openGame('3x3.html')">
+
+            🧩 3×3滑塊拼圖
+        </button>
+
+        <button
+            class="game-btn"
+            onclick="openGame('blockblast.html')">
+
+            💥 Block Blast
+        </button>
+
+        <button
+            class="game-btn"
+            onclick="openGame('suika.html')">
+
+            🍉 合成大西瓜
+        </button>
+
+        <button
+            class="game-btn"
+            onclick="openGame('minesweeper.html')">
+
+            🐸 青蛙踩地雷
+        </button>
+
+    </div>
 
 </div>
 
-<div class="logo">
-🦆 Duck Arcade
-</div>
-
-<div class="subtitle">
-遊戲中心
-</div>
-
-<div class="menu">
-
-<button
-class="game-btn"
-onclick="openGame('3x3.html')">
-
-🧩 3×3滑塊拼圖
-
-</button>
-
-<button
-class="game-btn"
-onclick="openGame('blockblast.html')">
-
-💥 Block Blast
-
-</button>
-
-<button
-class="game-btn"
-onclick="openGame('suika.html')">
-
-🍉 合成大西瓜
-
-</button>
-
-<button
-class="game-btn"
-onclick="openGame('minesweeper.html')">
-
-🐸 青蛙踩地雷
-
-</button>
-
-</div>
-
-</div>
-
-<!-- =====================
+<!-- =======================
 遊戲區
-===================== -->
+======================= -->
 
 <div id="gameScreen">
 
-<iframe
-id="gameFrame"
-loading="eager">
-</iframe>
+    <iframe
+        id="gameFrame"
+        loading="eager">
+    </iframe>
 
 </div>
 
 <!-- Home按鈕 -->
 
 <button
-id="homeBtn"
-onclick="goHome()">
+    id="homeBtn"
+    onclick="goHome()"
+    title="返回大廳">
 
-🏠
+    🦆
 
 </button>
 
 <script>
 
-/* =====================
-切換
-===================== */
+/* ===================
+切換頁面
+=================== */
 
 function openGame(file){
 
-document
-.getElementById("home")
-.style.display="none";
+    document
+    .getElementById("home")
+    .style.display="none";
 
-document
-.getElementById("gameScreen")
-.style.display="block";
+    document
+    .getElementById("gameScreen")
+    .style.display="block";
 
-document
-.getElementById("homeBtn")
-.style.display="block";
+    document
+    .getElementById("homeBtn")
+    .style.display="block";
 
-document
-.getElementById("gameFrame")
-.src=file;
+    document
+    .getElementById("gameFrame")
+    .src=file;
 }
 
 function goHome(){
 
-document
-.getElementById("gameScreen")
-.style.display="none";
+    document
+    .getElementById("gameFrame")
+    .src="";
 
-document
-.getElementById("homeBtn")
-.style.display="none";
+    document
+    .getElementById("gameScreen")
+    .style.display="none";
 
-document
-.getElementById("home")
-.style.display="flex";
+    document
+    .getElementById("homeBtn")
+    .style.display="none";
+
+    document
+    .getElementById("home")
+    .style.display="flex";
 }
 
-/* =====================
-小鴨散步
-===================== */
+/* ===================
+鴨子散步
+=================== */
 
 const duck =
 document.getElementById("duck");
 
 function moveDuck(){
 
-const maxX =
-window.innerWidth - 100;
+    const maxX =
+        window.innerWidth - 100;
 
-const maxY =
-window.innerHeight * 0.35;
+    const maxY =
+        window.innerHeight * 0.35;
 
-const x =
-Math.random() * maxX;
+    const x =
+        Math.random() * maxX;
 
-const y =
-Math.random() * maxY;
+    const y =
+        Math.random() * maxY;
 
-duck.style.left =
-x + "px";
+    duck.style.left =
+        x + "px";
 
-duck.style.top =
-y + "px";
+    duck.style.top =
+        y + "px";
 
-duck.style.transform =
-Math.random() > .5
-? "scaleX(-1)"
-: "scaleX(1)";
+    duck.style.transform =
+        Math.random() > .5
+        ? "scaleX(-1)"
+        : "scaleX(1)";
 }
 
 moveDuck();
 
 setInterval(
-moveDuck,
-6000
+    moveDuck,
+    6000
 );
 
 </script>
