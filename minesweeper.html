@@ -1,0 +1,1696 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>夜間模式 Q版青蛙踩地雷</title>
+  <style>
+    :root {
+      --bg-main: #0f1218;
+      --bg-panel: #181d27;
+      --bg-card: #212836;
+      --bg-cell-hidden: #2a3344;
+      --bg-cell-hover: #354156;
+      --bg-cell-revealed: #141820;
+      --border-subtle: #303a4d;
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --accent-green: #4ade80;
+      --accent-green-dark: #16a34a;
+      --accent-amber: #fbbf24;
+      --accent-red: #f87171;
+      --accent-cyan: #38bdf8;
+      --shadow-glow: 0 10px 30px rgba(0, 0, 0, 0.55);
+      --cell-size: 32px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+      user-select: none;
+      touch-action: manipulation;
+    }
+
+    html, body {
+      width: 100%;
+      max-width: 100vw;
+      overflow-x: hidden;
+      overscroll-behavior-x: none;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+      background-color: var(--bg-main);
+      background-image:
+        radial-gradient(circle at 15% 15%, rgba(56, 189, 248, 0.06), transparent 35%),
+        radial-gradient(circle at 85% 85%, rgba(74, 222, 128, 0.06), transparent 35%);
+      color: var(--text-primary);
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 10px 8px 24px;
+    }
+
+    /* 畫面震動動畫 (踩雷爆炸時) */
+    @keyframes screenShake {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      10% { transform: translate(-8px, -6px) rotate(-0.8deg); }
+      20% { transform: translate(9px, 5px) rotate(0.8deg); }
+      30% { transform: translate(-7px, 6px) rotate(-0.5deg); }
+      40% { transform: translate(7px, -5px) rotate(0.5deg); }
+      50% { transform: translate(-5px, -3px) rotate(-0.3deg); }
+      60% { transform: translate(5px, 4px) rotate(0.3deg); }
+      70% { transform: translate(-3px, 2px) rotate(0deg); }
+      80% { transform: translate(3px, -2px) rotate(0deg); }
+    }
+
+    .shake-active {
+      animation: screenShake 0.55s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+    }
+
+    /* 主容器 */
+    .app-container {
+      width: 100%;
+      max-width: 1120px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* 標題與難度列 */
+    .top-bar {
+      width: 100%;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-subtle);
+      border-radius: 18px;
+      padding: 10px 14px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      box-shadow: var(--shadow-glow);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-badge {
+      background: rgba(74, 222, 128, 0.14);
+      color: var(--accent-green);
+      border: 1px solid rgba(74, 222, 128, 0.35);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 999px;
+      letter-spacing: 0.5px;
+    }
+
+    .brand h1 {
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      color: var(--text-primary);
+    }
+
+    .difficulty-group {
+      display: flex;
+      background: var(--bg-main);
+      padding: 4px;
+      border-radius: 12px;
+      border: 1px solid var(--border-subtle);
+      gap: 4px;
+    }
+
+    .diff-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      padding: 7px 11px;
+      border-radius: 9px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .diff-btn:hover {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .diff-btn.active {
+      background: var(--bg-card);
+      color: var(--accent-green);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(74, 222, 128, 0.3);
+    }
+
+    /* 遊戲核心區域 */
+    .game-workspace {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    @media (min-width: 960px) {
+      .game-workspace {
+        flex-direction: row;
+        align-items: flex-start;
+        justify-content: center;
+      }
+    }
+
+    /* 遊戲主卡片 */
+    .board-card {
+      width: 100%;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-subtle);
+      border-radius: 20px;
+      padding: 12px 10px;
+      box-shadow: var(--shadow-glow);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    @media (min-width: 960px) {
+      .board-card {
+        width: auto;
+        padding: 16px;
+      }
+    }
+
+    /* 狀態儀表板（步數 - Q版青蛙 - 計時器） */
+    .hud-header {
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 8px 14px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .stat-box {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .stat-box.left { align-items: flex-start; }
+    .stat-box.right { align-items: flex-end; }
+
+    .stat-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .stat-value {
+      font-family: "SF Mono", "JetBrains Mono", "Fira Code", monospace;
+      font-size: 23px;
+      font-weight: 800;
+      line-height: 1.15;
+      margin-top: 2px;
+      color: var(--text-primary);
+    }
+
+    .stat-value.steps-color { color: var(--accent-cyan); }
+    .stat-value.timer-color { color: var(--accent-amber); }
+
+    .sub-mine-pill {
+      margin-top: 3px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      background: rgba(15, 18, 24, 0.65);
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    /* 中央 Q版青蛙按鈕 */
+    .frog-avatar-btn {
+      position: relative;
+      width: 74px;
+      height: 68px;
+      border-radius: 18px;
+      background: radial-gradient(circle at 50% 35%, #283548, #171e2b);
+      border: 2px solid #38465e;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.15s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45), inset 0 1px 1px rgba(255, 255, 255, 0.12);
+      padding: 2px;
+    }
+
+    .frog-avatar-btn:hover {
+      transform: translateY(-2px);
+      border-color: var(--accent-green);
+      box-shadow: 0 8px 20px rgba(74, 222, 128, 0.2);
+    }
+
+    .frog-avatar-btn:active { transform: scale(0.95); }
+
+    .frog-avatar-btn.state-shocked {
+      border-color: var(--accent-red);
+      box-shadow: 0 0 22px rgba(248, 113, 113, 0.45);
+    }
+
+    .frog-avatar-btn.state-win {
+      border-color: var(--accent-amber);
+      box-shadow: 0 0 22px rgba(251, 191, 36, 0.45);
+    }
+
+    #frogSvg {
+      width: 68px;
+      height: 60px;
+      overflow: visible;
+    }
+
+    .frog-mouth-open,
+    .frog-mouth-shock,
+    .frog-mouth-win,
+    .frog-eyes-shock,
+    .frog-eyes-win,
+    .frog-sweat,
+    .frog-blush-shock {
+      display: none;
+    }
+
+    .frog-avatar-btn.state-open .frog-mouth-idle { display: none; }
+    .frog-avatar-btn.state-open .frog-mouth-open { display: block; }
+    .frog-avatar-btn.state-open #frogBodyGroup {
+      transform: translateY(-1.5px) scale(1.03);
+      transform-origin: center bottom;
+    }
+
+    .frog-avatar-btn.state-shocked .frog-mouth-idle { display: none; }
+    .frog-avatar-btn.state-shocked .frog-mouth-shock { display: block; }
+    .frog-avatar-btn.state-shocked .frog-eyes-idle { display: none; }
+    .frog-avatar-btn.state-shocked .frog-eyes-shock { display: block; }
+    .frog-avatar-btn.state-shocked .frog-sweat { display: block; }
+    .frog-avatar-btn.state-shocked .frog-blush-idle { display: none; }
+    .frog-avatar-btn.state-shocked .frog-blush-shock { display: block; }
+
+    .frog-avatar-btn.state-win .frog-mouth-idle { display: none; }
+    .frog-avatar-btn.state-win .frog-mouth-win { display: block; }
+    .frog-avatar-btn.state-win .frog-eyes-win { display: block; }
+
+    #frogBodyGroup {
+      transition: transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    /* 棋盤外框（鎖定螢幕寬度內自適應，無需水平拉動） */
+    .board-wrapper {
+      width: 100%;
+      overflow: hidden;
+      padding: 4px;
+      border-radius: 14px;
+      background: #0d1016;
+      border: 1px solid #252d3d;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* 踩地雷網格 */
+    .mine-grid {
+      display: grid;
+      gap: 2px;
+      padding: 2px;
+      background: #0d1016;
+      border-radius: 10px;
+      margin: 0 auto;
+    }
+
+    .cell {
+      width: var(--cell-size);
+      height: var(--cell-size);
+      border-radius: clamp(4px, calc(var(--cell-size) * 0.2), 7px);
+      background: linear-gradient(145deg, #2e384b, #232b3a);
+      border: 1px solid #39455c;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 1px 2px rgba(0, 0, 0, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: "SF Mono", "JetBrains Mono", monospace;
+      font-weight: 800;
+      font-size: clamp(11px, calc(var(--cell-size) * 0.54), 18px);
+      line-height: 1;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.12s ease, transform 0.08s ease, box-shadow 0.15s ease;
+    }
+
+    .cell:hover:not(.revealed) {
+      background: linear-gradient(145deg, #38445b, #2b3547);
+      border-color: #4f5f7d;
+    }
+
+    .cell:active:not(.revealed) {
+      transform: scale(0.92);
+    }
+
+    .cell.revealed {
+      background: var(--bg-cell-revealed);
+      border: 1px solid #1e2430;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+      cursor: default;
+    }
+
+    .cell.revealed.has-number {
+      cursor: pointer;
+    }
+
+    .cell.flagged {
+      background: linear-gradient(145deg, #333c4f, #232b3b);
+      border-color: rgba(251, 191, 36, 0.65);
+    }
+
+    /* 提示高亮動畫 */
+    @keyframes hintPulse {
+      0%, 100% {
+        box-shadow: 0 0 0 2px #4ade80, 0 0 14px rgba(74, 222, 128, 0.8);
+        background: rgba(74, 222, 128, 0.25);
+        transform: scale(1);
+      }
+      50% {
+        box-shadow: 0 0 0 3px #86efac, 0 0 22px rgba(74, 222, 128, 1);
+        background: rgba(74, 222, 128, 0.42);
+        transform: scale(1.06);
+      }
+    }
+
+    @keyframes hintMinePulse {
+      0%, 100% {
+        box-shadow: 0 0 0 2px #fbbf24, 0 0 14px rgba(251, 191, 36, 0.85);
+        background: rgba(251, 191, 36, 0.25);
+        transform: scale(1);
+      }
+      50% {
+        box-shadow: 0 0 0 3px #fde68a, 0 0 22px rgba(251, 191, 36, 1);
+        background: rgba(251, 191, 36, 0.42);
+        transform: scale(1.06);
+      }
+    }
+
+    .cell.hint-safe {
+      animation: hintPulse 1s infinite ease-in-out;
+      z-index: 5;
+      border-color: #4ade80 !important;
+    }
+
+    .cell.hint-mine {
+      animation: hintMinePulse 1s infinite ease-in-out;
+      z-index: 5;
+      border-color: #fbbf24 !important;
+    }
+
+    /* 踩中地雷樣式 */
+    .cell.mine-exploded {
+      background: radial-gradient(circle, #ef4444 15%, #991b1b 90%) !important;
+      border-color: #fca5a5 !important;
+      box-shadow: 0 0 18px rgba(239, 68, 68, 0.9);
+      z-index: 4;
+    }
+
+    .cell.mine-revealed {
+      background: #23181c;
+      border-color: #4c232b;
+    }
+
+    .cell.flag-wrong {
+      background: #2d1b22;
+      border-color: #f87171;
+    }
+
+    /* 夜間模式高對比護眼數字色 */
+    .num-1 { color: #38bdf8; text-shadow: 0 0 8px rgba(56, 189, 248, 0.35); }
+    .num-2 { color: #4ade80; text-shadow: 0 0 8px rgba(74, 222, 128, 0.35); }
+    .num-3 { color: #fb7185; text-shadow: 0 0 8px rgba(251, 113, 133, 0.35); }
+    .num-4 { color: #a78bfa; text-shadow: 0 0 8px rgba(167, 139, 250, 0.35); }
+    .num-5 { color: #fbbf24; text-shadow: 0 0 8px rgba(251, 191, 36, 0.35); }
+    .num-6 { color: #2dd4bf; text-shadow: 0 0 8px rgba(45, 212, 191, 0.35); }
+    .num-7 { color: #f472b6; text-shadow: 0 0 8px rgba(244, 114, 182, 0.35); }
+    .num-8 { color: #cbd5e1; text-shadow: 0 0 8px rgba(203, 213, 225, 0.35); }
+
+    /* 右側／下方控制與無限提示面板 */
+    .side-panel {
+      width: 100%;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-subtle);
+      border-radius: 20px;
+      padding: 14px;
+      box-shadow: var(--shadow-glow);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    @media (min-width: 960px) {
+      .side-panel {
+        width: 265px;
+        flex-shrink: 0;
+      }
+    }
+
+    .panel-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      letter-spacing: 0.6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .action-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    @media (min-width: 960px) {
+      .action-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .tool-btn {
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border-radius: 14px;
+      padding: 11px 12px;
+      font-size: 13.5px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      transition: all 0.18s ease;
+    }
+
+    .tool-btn:hover {
+      transform: translateY(-1px);
+      border-color: #4b5a75;
+      background: #283142;
+    }
+
+    .tool-btn:active { transform: scale(0.97); }
+
+    /* 無限次提示按鈕 */
+    .tool-btn.hint-btn {
+      background: linear-gradient(135deg, rgba(74, 222, 128, 0.16), rgba(56, 189, 248, 0.14));
+      border-color: rgba(74, 222, 128, 0.45);
+      color: #ecfdf5;
+    }
+
+    .infinity-badge {
+      background: var(--accent-green);
+      color: #052e16;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 999px;
+    }
+
+    /* 插旗／挖掘模式切換按鈕 */
+    .tool-btn.flag-mode-btn {
+      border-color: rgba(56, 189, 248, 0.45);
+      background: rgba(56, 189, 248, 0.12);
+      color: #e0f2fe;
+    }
+
+    .tool-btn.flag-mode-btn.active {
+      background: linear-gradient(135deg, rgba(251, 191, 36, 0.28), rgba(248, 113, 113, 0.22));
+      border-color: var(--accent-amber);
+      color: #fef3c7;
+      box-shadow: 0 0 16px rgba(251, 191, 36, 0.35);
+    }
+
+    .mode-pill {
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.22);
+      color: #7dd3fc;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .tool-btn.flag-mode-btn.active .mode-pill {
+      background: var(--accent-amber);
+      color: #1c1917;
+      font-weight: 800;
+    }
+
+    /* 提示訊息框 */
+    .hint-status-box {
+      background: var(--bg-main);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 12.5px;
+      line-height: 1.5;
+      color: var(--text-secondary);
+      min-height: 52px;
+      display: flex;
+      align-items: center;
+    }
+
+    .hint-status-box strong { color: var(--accent-green); }
+    .hint-status-box.warn strong { color: var(--accent-amber); }
+    .hint-status-box.danger strong { color: var(--accent-red); }
+
+    .tips-list {
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      border-top: 1px solid var(--border-subtle);
+      padding-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    /* 全畫面爆炸特效畫布 */
+    #explosionCanvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* 勝利／Game Over 浮動橫幅 */
+    .game-banner {
+      width: 100%;
+      padding: 9px 12px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 700;
+      text-align: center;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .game-banner.show { display: flex; }
+
+    .game-banner.gameover {
+      background: rgba(239, 68, 68, 0.16);
+      border: 1px solid rgba(248, 113, 113, 0.45);
+      color: #fecaca;
+    }
+
+    .game-banner.victory {
+      background: rgba(74, 222, 128, 0.16);
+      border: 1px solid rgba(74, 222, 128, 0.45);
+      color: #bbf7d0;
+    }
+  </style>
+</head>
+<body>
+  <!-- 爆炸粒子動畫 Canvas -->
+  <canvas id="explosionCanvas"></canvas>
+
+  <div class="app-container" id="appRoot">
+    <!-- 頂部標題與難度選擇 -->
+    <header class="top-bar">
+      <div class="brand">
+        <span class="brand-badge">夜間護眼版</span>
+        <h1>🐸 青蛙踩地雷</h1>
+      </div>
+
+      <div class="difficulty-group" role="group" aria-label="難度選擇">
+        <button class="diff-btn active" data-diff="beginner">初級 9×9</button>
+        <button class="diff-btn" data-diff="intermediate">中級 16×16</button>
+        <button class="diff-btn" data-diff="expert" id="expertDiffBtn">高級 16×30</button>
+      </div>
+    </header>
+
+    <!-- 遊戲主工作區 -->
+    <main class="game-workspace">
+      <!-- 左側：HUD 狀態欄 + 棋盤 -->
+      <section class="board-card">
+        <div class="hud-header">
+          <div class="stat-box left">
+            <div class="stat-label">👣 步數</div>
+            <div class="stat-value steps-color" id="stepCount">000</div>
+            <div class="sub-mine-pill">💣 剩餘: <span id="minesLeft">10</span></div>
+          </div>
+
+          <button
+            type="button"
+            class="frog-avatar-btn"
+            id="frogBtn"
+            title="點擊青蛙重新開始遊戲"
+            aria-label="Q版青蛙狀態與重新開始按鈕"
+          >
+            <svg id="frogSvg" viewBox="0 0 120 105" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <radialGradient id="frogSkin" cx="50%" cy="35%" r="65%">
+                  <stop offset="0%" stop-color="#86efac" />
+                  <stop offset="55%" stop-color="#4ade80" />
+                  <stop offset="100%" stop-color="#16a34a" />
+                </radialGradient>
+                <radialGradient id="frogBelly" cx="50%" cy="50%" r="55%">
+                  <stop offset="0%" stop-color="#fef9c3" />
+                  <stop offset="100%" stop-color="#fde047" />
+                </radialGradient>
+                <ellipse id="groundShadow" cx="60" cy="96" rx="46" ry="6" fill="rgba(0,0,0,0.45)" />
+              </defs>
+
+              <use href="#groundShadow" />
+
+              <g id="frogBodyGroup">
+                <path d="M 16 78 Q 6 76 8 85 Q 11 91 24 89 Z" fill="#15803d" stroke="#052e16" stroke-width="2" />
+                <path d="M 104 78 Q 114 76 112 85 Q 109 91 96 89 Z" fill="#15803d" stroke="#052e16" stroke-width="2" />
+
+                <ellipse cx="60" cy="64" rx="42" ry="28" fill="url(#frogSkin)" stroke="#052e16" stroke-width="2.5" />
+                <path d="M 38 82 Q 60 72 82 82 Q 74 90 60 90 Q 46 90 38 82 Z" fill="url(#frogBelly)" />
+
+                <ellipse cx="60" cy="48" rx="38" ry="25" fill="url(#frogSkin)" stroke="#052e16" stroke-width="2.5" />
+                <ellipse cx="60" cy="56" rx="34" ry="18" fill="url(#frogSkin)" />
+
+                <circle cx="36" cy="26" r="16" fill="url(#frogSkin)" stroke="#052e16" stroke-width="2.5" />
+                <circle cx="84" cy="26" r="16" fill="url(#frogSkin)" stroke="#052e16" stroke-width="2.5" />
+                <ellipse cx="60" cy="34" rx="28" ry="12" fill="url(#frogSkin)" />
+
+                <circle cx="54" cy="45" r="1.8" fill="#052e16" opacity="0.7" />
+                <circle cx="66" cy="45" r="1.8" fill="#052e16" opacity="0.7" />
+
+                <g class="frog-blush-idle">
+                  <ellipse cx="29" cy="52" rx="6.5" ry="3.5" fill="#fb7185" opacity="0.65" />
+                  <ellipse cx="91" cy="52" rx="6.5" ry="3.5" fill="#fb7185" opacity="0.65" />
+                </g>
+
+                <g class="frog-blush-shock">
+                  <ellipse cx="29" cy="52" rx="7" ry="4" fill="#818cf8" opacity="0.75" />
+                  <ellipse cx="91" cy="52" rx="7" ry="4" fill="#818cf8" opacity="0.75" />
+                </g>
+
+                <g class="frog-eyes-idle">
+                  <circle cx="36" cy="26" r="11.5" fill="#ffffff" stroke="#052e16" stroke-width="1.8" />
+                  <circle cx="37" cy="26" r="6.2" fill="#0f172a" />
+                  <circle cx="34.5" cy="23.5" r="2.6" fill="#ffffff" />
+                  <circle cx="39.5" cy="28.5" r="1.2" fill="#ffffff" />
+
+                  <circle cx="84" cy="26" r="11.5" fill="#ffffff" stroke="#052e16" stroke-width="1.8" />
+                  <circle cx="83" cy="26" r="6.2" fill="#0f172a" />
+                  <circle cx="80.5" cy="23.5" r="2.6" fill="#ffffff" />
+                  <circle cx="85.5" cy="28.5" r="1.2" fill="#ffffff" />
+                </g>
+
+                <g class="frog-eyes-shock">
+                  <circle cx="36" cy="25" r="13" fill="#ffffff" stroke="#052e16" stroke-width="2" />
+                  <circle cx="36" cy="25" r="2.8" fill="#0f172a" />
+                  <circle cx="36" cy="25" r="9.5" fill="none" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="3 2" />
+
+                  <circle cx="84" cy="25" r="13" fill="#ffffff" stroke="#052e16" stroke-width="2" />
+                  <circle cx="84" cy="25" r="2.8" fill="#0f172a" />
+                  <circle cx="84" cy="25" r="9.5" fill="none" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="3 2" />
+                </g>
+
+                <g class="frog-eyes-win">
+                  <rect x="21" y="17" width="30" height="17" rx="5" fill="#090d16" stroke="#fbbf24" stroke-width="2" />
+                  <rect x="69" y="17" width="30" height="17" rx="5" fill="#090d16" stroke="#fbbf24" stroke-width="2" />
+                  <line x1="51" y1="23" x2="69" y2="23" stroke="#fbbf24" stroke-width="3" />
+                  <line x1="26" y1="21" x2="34" y2="30" stroke="rgba(255,255,255,0.45)" stroke-width="2.5" stroke-linecap="round" />
+                  <line x1="74" y1="21" x2="82" y2="30" stroke="rgba(255,255,255,0.45)" stroke-width="2.5" stroke-linecap="round" />
+                </g>
+
+                <g class="frog-mouth-idle">
+                  <path d="M 44 55 Q 60 63 76 55" fill="none" stroke="#052e16" stroke-width="2.8" stroke-linecap="round" />
+                </g>
+
+                <g class="frog-mouth-open">
+                  <ellipse cx="60" cy="59" rx="11" ry="9" fill="#991b1b" stroke="#052e16" stroke-width="2.4" />
+                  <path d="M 52 63 Q 60 58 68 63 Q 64 67 60 67 Q 56 67 52 63 Z" fill="#fb7185" />
+                </g>
+
+                <g class="frog-mouth-shock">
+                  <path d="M 44 63 C 44 49, 76 49, 76 63 C 76 73, 44 73, 44 63 Z" fill="#7f1d1d" stroke="#052e16" stroke-width="2.5" />
+                  <path d="M 50 68 Q 60 62 70 68 Q 60 72 50 68 Z" fill="#f43f5e" />
+                </g>
+
+                <g class="frog-mouth-win">
+                  <path d="M 41 53 Q 60 74 79 53 Z" fill="#991b1b" stroke="#052e16" stroke-width="2.4" stroke-linejoin="round" />
+                  <path d="M 48 60 Q 60 66 72 60 Q 60 69 48 60 Z" fill="#fb7185" />
+                </g>
+
+                <g class="frog-sweat">
+                  <path d="M 103 32 C 103 32, 109 41, 109 45 A 6 6 0 1 1 97 45 C 97 41, 103 32, 103 32 Z" fill="#38bdf8" stroke="#0284c7" stroke-width="1.5" />
+                  <line x1="60" y1="4" x2="60" y2="13" stroke="#fbbf24" stroke-width="3" stroke-linecap="round" />
+                  <line x1="48" y1="7" x2="52" y2="15" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round" />
+                  <line x1="72" y1="7" x2="68" y2="15" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round" />
+                </g>
+
+                <g id="frontPaws">
+                  <path d="M 27 76 Q 22 88 28 92 Q 33 93 35 88 Q 38 94 43 92 Q 47 90 45 86 Q 49 91 53 88 Q 55 83 47 75 Z" fill="#4ade80" stroke="#052e16" stroke-width="2.2" stroke-linejoin="round" />
+                  <path d="M 93 76 Q 98 88 92 92 Q 87 93 85 88 Q 82 94 77 92 Q 73 90 75 86 Q 71 91 67 88 Q 65 83 73 75 Z" fill="#4ade80" stroke="#052e16" stroke-width="2.2" stroke-linejoin="round" />
+                </g>
+              </g>
+            </svg>
+          </button>
+
+          <div class="stat-box right">
+            <div class="stat-label">⏱️ 時間</div>
+            <div class="stat-value timer-color" id="timerDisplay">000</div>
+            <div class="sub-mine-pill" id="diffTag">初級 9×9</div>
+          </div>
+        </div>
+
+        <div class="game-banner" id="gameBanner"></div>
+
+        <!-- 鎖定寬度自適應棋盤容器 -->
+        <div class="board-wrapper" id="boardWrapper">
+          <div class="mine-grid" id="mineGrid" role="grid" aria-label="踩地雷棋盤"></div>
+        </div>
+      </section>
+
+      <!-- 右側／下方：無限次提示與輔助控制區 -->
+      <aside class="side-panel">
+        <div class="panel-title">
+          <span>🎮 輔助與提示系統</span>
+          <span style="color: var(--accent-green); font-size: 11px;">● 螢幕自適應</span>
+        </div>
+
+        <div class="action-grid">
+          <button type="button" class="tool-btn hint-btn" id="hintBtn">
+            <span>💡 智慧提示</span>
+            <span class="infinity-badge">∞ 無限</span>
+          </button>
+
+          <button type="button" class="tool-btn flag-mode-btn" id="flagModeBtn" aria-pressed="false">
+            <span id="flagModeLabel">⛏️ 挖掘模式</span>
+            <span class="mode-pill" id="flagModeState">點擊切換</span>
+          </button>
+
+          <button type="button" class="tool-btn" id="restartBtn">
+            <span>🔄 重新開始</span>
+            <span class="mode-pill">重置</span>
+          </button>
+
+          <button type="button" class="tool-btn" id="soundBtn">
+            <span>🔊 音效回饋</span>
+            <span class="mode-pill" id="soundState">開啟</span>
+          </button>
+        </div>
+
+        <div class="hint-status-box" id="hintStatusBox">
+          <span>卡關了嗎？隨時點擊「<strong>智慧提示 ∞</strong>」，青蛙會幫你找出安全格或地雷位置！</span>
+        </div>
+
+        <div class="tips-list">
+          <div>• <strong>點擊格子</strong>：挖掘模式翻開、插旗模式連續標記/取消</div>
+          <div>• <strong>長按 / 右鍵</strong>：隨時快速插旗或取消旗幟</div>
+          <div>• <strong>點擊數字格</strong>：周圍旗數相符時自動快速展開</div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script>
+    (() => {
+      // ==================== 難度配置（手機直向自動轉向高級網格免左右拉動） ====================
+      function getDifficultyConfig(diffKey) {
+        const isPortraitMobile = window.innerWidth < 640;
+        if (diffKey === "beginner") {
+          return { label: "初級 9×9", rows: 9, cols: 9, mines: 10 };
+        }
+        if (diffKey === "intermediate") {
+          return { label: "中級 16×16", rows: 16, cols: 16, mines: 40 };
+        }
+        return isPortraitMobile
+          ? { label: "高級 16×30", rows: 30, cols: 16, mines: 99 }
+          : { label: "高級 30×16", rows: 16, cols: 30, mines: 99 };
+      }
+
+      // ==================== 遊戲狀態 ====================
+      let currentDiffKey = "beginner";
+      let rows = 9;
+      let cols = 9;
+      let totalMines = 10;
+
+      let board = [];
+      let gameState = "idle"; // 'idle' | 'playing' | 'won' | 'lost'
+      let steps = 0;
+      let flagsPlaced = 0;
+      let revealedCount = 0;
+
+      let timerSeconds = 0;
+      let timerInterval = null;
+      let frogMouthTimeout = null;
+
+      let flagMode = false;
+      let soundEnabled = true;
+      let audioCtx = null;
+
+      // ==================== DOM 元素 ====================
+      const appRoot = document.getElementById("appRoot");
+      const mineGrid = document.getElementById("mineGrid");
+      const boardWrapper = document.getElementById("boardWrapper");
+      const stepCountEl = document.getElementById("stepCount");
+      const minesLeftEl = document.getElementById("minesLeft");
+      const timerDisplayEl = document.getElementById("timerDisplay");
+      const diffTagEl = document.getElementById("diffTag");
+      const frogBtn = document.getElementById("frogBtn");
+      const gameBanner = document.getElementById("gameBanner");
+      const hintBtn = document.getElementById("hintBtn");
+      const hintStatusBox = document.getElementById("hintStatusBox");
+      const flagModeBtn = document.getElementById("flagModeBtn");
+      const flagModeLabel = document.getElementById("flagModeLabel");
+      const flagModeState = document.getElementById("flagModeState");
+      const expertDiffBtn = document.getElementById("expertDiffBtn");
+      const restartBtn = document.getElementById("restartBtn");
+      const soundBtn = document.getElementById("soundBtn");
+      const soundState = document.getElementById("soundState");
+      const diffBtns = document.querySelectorAll(".diff-btn");
+
+      function updateDifficultyButtonLabels() {
+        if (expertDiffBtn) {
+          expertDiffBtn.textContent = window.innerWidth < 640 ? "高級 16×30" : "高級 30×16";
+        }
+      }
+      updateDifficultyButtonLabels();
+
+      // ==================== Web Audio API 音效 ====================
+      function initAudio() {
+        if (!audioCtx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextClass) {
+            audioCtx = new AudioContextClass();
+          }
+        }
+        if (audioCtx && audioCtx.state === "suspended") {
+          audioCtx.resume();
+        }
+      }
+
+      function playSound(type) {
+        if (!soundEnabled) return;
+        try {
+          initAudio();
+          if (!audioCtx) return;
+
+          const now = audioCtx.currentTime;
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+
+          if (type === "step") {
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(340, now);
+            osc.frequency.exponentialRampToValueAtTime(520, now + 0.07);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+            osc.start(now);
+            osc.stop(now + 0.08);
+          } else if (type === "flag") {
+            osc.type = "triangle";
+            osc.frequency.setValueAtTime(580, now);
+            osc.frequency.exponentialRampToValueAtTime(760, now + 0.08);
+            gain.gain.setValueAtTime(0.11, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+            osc.start(now);
+            osc.stop(now + 0.09);
+          } else if (type === "hint") {
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(523.25, now);
+            osc.frequency.setValueAtTime(659.25, now + 0.08);
+            osc.frequency.setValueAtTime(783.99, now + 0.16);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+            osc.start(now);
+            osc.stop(now + 0.32);
+          } else if (type === "win") {
+            const notes = [523.25, 659.25, 783.99, 1046.5];
+            notes.forEach((freq, idx) => {
+              const o = audioCtx.createOscillator();
+              const g = audioCtx.createGain();
+              o.type = "triangle";
+              o.frequency.setValueAtTime(freq, now + idx * 0.1);
+              g.gain.setValueAtTime(0.14, now + idx * 0.1);
+              g.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.1 + 0.25);
+              o.connect(g);
+              g.connect(audioCtx.destination);
+              o.start(now + idx * 0.1);
+              o.stop(now + idx * 0.1 + 0.25);
+            });
+          } else if (type === "boom") {
+            osc.type = "sawtooth";
+            osc.frequency.setValueAtTime(130, now);
+            osc.frequency.exponentialRampToValueAtTime(28, now + 0.65);
+            gain.gain.setValueAtTime(0.32, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+            osc.start(now);
+            osc.stop(now + 0.7);
+
+            const bufferSize = audioCtx.sampleRate * 0.6;
+            const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+              output[i] = Math.random() * 2 - 1;
+            }
+            const whiteNoise = audioCtx.createBufferSource();
+            whiteNoise.buffer = noiseBuffer;
+
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = "lowpass";
+            filter.frequency.setValueAtTime(900, now);
+            filter.frequency.exponentialRampToValueAtTime(120, now + 0.6);
+
+            const noiseGain = audioCtx.createGain();
+            noiseGain.gain.setValueAtTime(0.35, now);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+
+            whiteNoise.connect(filter);
+            filter.connect(noiseGain);
+            noiseGain.connect(audioCtx.destination);
+            whiteNoise.start(now);
+          }
+        } catch (e) {}
+      }
+
+      // ==================== 青蛙表情控制 ====================
+      function setFrogState(state) {
+        frogBtn.classList.remove("state-open", "state-shocked", "state-win");
+        if (state === "open") frogBtn.classList.add("state-open");
+        else if (state === "shocked") frogBtn.classList.add("state-shocked");
+        else if (state === "win") frogBtn.classList.add("state-win");
+      }
+
+      function triggerFrogStepMouth() {
+        if (gameState === "lost" || gameState === "won") return;
+        clearTimeout(frogMouthTimeout);
+        setFrogState("open");
+        frogMouthTimeout = setTimeout(() => {
+          if (gameState !== "lost" && gameState !== "won") {
+            setFrogState("idle");
+          }
+        }, 320);
+      }
+
+      // ==================== 爆炸粒子 Canvas 特效 ====================
+      const explosionCanvas = document.getElementById("explosionCanvas");
+      const expCtx = explosionCanvas.getContext("2d");
+      let particles = [];
+      let shockwaves = [];
+      let flashAlpha = 0;
+      let animFrameId = null;
+
+      function resizeExplosionCanvas() {
+        explosionCanvas.width = window.innerWidth;
+        explosionCanvas.height = window.innerHeight;
+      }
+
+      // 精準計算並鎖定格子尺寸，確保 100% 符合螢幕寬度不產生橫向滾動條
+      function calculateOptimalCellSize() {
+        const wrapperWidth = boardWrapper.clientWidth;
+        const isDesktopSideBySide = window.innerWidth >= 960;
+        const fallbackWidth = isDesktopSideBySide
+          ? Math.min(760, window.innerWidth - 330)
+          : window.innerWidth - 46;
+
+        const usableWidth = Math.max(220, (wrapperWidth > 40 ? wrapperWidth : fallbackWidth) - 14);
+        const gap = 2;
+        const maxCellByWidth = Math.floor((usableWidth - (cols - 1) * gap) / cols);
+
+        const maxAllowed = window.innerWidth < 640 ? 36 : 36;
+        const minAllowed = 15;
+        const optimalSize = Math.max(minAllowed, Math.min(maxAllowed, maxCellByWidth));
+
+        document.documentElement.style.setProperty("--cell-size", `${optimalSize}px`);
+      }
+
+      function handleViewportChange() {
+        resizeExplosionCanvas();
+        updateDifficultyButtonLabels();
+        if (currentDiffKey === "expert" && gameState === "idle") {
+          const cfg = getDifficultyConfig("expert");
+          if (cfg.cols !== cols || cfg.rows !== rows) {
+            initGame("expert");
+            return;
+          }
+        }
+        calculateOptimalCellSize();
+      }
+
+      window.addEventListener("resize", handleViewportChange);
+      window.addEventListener("orientationchange", () => {
+        setTimeout(handleViewportChange, 150);
+      });
+      resizeExplosionCanvas();
+
+      function triggerExplosionEffect(screenX, screenY) {
+        appRoot.classList.remove("shake-active");
+        void appRoot.offsetWidth;
+        appRoot.classList.add("shake-active");
+
+        flashAlpha = 0.55;
+        shockwaves.push(
+          { x: screenX, y: screenY, radius: 8, maxRadius: 220, alpha: 0.95, color: "#fbbf24", width: 8 },
+          { x: screenX, y: screenY, radius: 4, maxRadius: 320, alpha: 0.75, color: "#ef4444", width: 4 }
+        );
+
+        const colors = ["#fef08a", "#fbbf24", "#f97316", "#ef4444", "#dc2626", "#94a3b8", "#475569"];
+        for (let i = 0; i < 85; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 2.5 + Math.random() * 11;
+          const isSmoke = i > 58;
+          particles.push({
+            x: screenX,
+            y: screenY,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - (isSmoke ? 1.5 : 2),
+            size: isSmoke ? 10 + Math.random() * 14 : 3 + Math.random() * 6,
+            color: isSmoke ? "rgba(71, 85, 105, 0.85)" : colors[Math.floor(Math.random() * 6)],
+            alpha: 1,
+            decay: isSmoke ? 0.015 + Math.random() * 0.01 : 0.02 + Math.random() * 0.02,
+            gravity: isSmoke ? -0.04 : 0.24
+          });
+        }
+
+        if (!animFrameId) {
+          renderExplosionLoop();
+        }
+      }
+
+      function renderExplosionLoop() {
+        expCtx.clearRect(0, 0, explosionCanvas.width, explosionCanvas.height);
+
+        if (flashAlpha > 0.01) {
+          expCtx.fillStyle = `rgba(254, 215, 170, ${flashAlpha})`;
+          expCtx.fillRect(0, 0, explosionCanvas.width, explosionCanvas.height);
+          flashAlpha *= 0.82;
+        }
+
+        for (let i = shockwaves.length - 1; i >= 0; i--) {
+          const sw = shockwaves[i];
+          sw.radius += (sw.maxRadius - sw.radius) * 0.14;
+          sw.alpha *= 0.91;
+
+          expCtx.beginPath();
+          expCtx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2);
+          expCtx.strokeStyle = sw.color;
+          expCtx.globalAlpha = Math.max(0, sw.alpha);
+          expCtx.lineWidth = sw.width * sw.alpha;
+          expCtx.stroke();
+
+          if (sw.alpha < 0.03) shockwaves.splice(i, 1);
+        }
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += p.gravity;
+          p.vx *= 0.96;
+          p.alpha -= p.decay;
+
+          if (p.alpha <= 0) {
+            particles.splice(i, 1);
+            continue;
+          }
+
+          expCtx.save();
+          expCtx.globalAlpha = Math.max(0, p.alpha);
+          expCtx.fillStyle = p.color;
+          expCtx.beginPath();
+          expCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          expCtx.fill();
+          expCtx.restore();
+        }
+
+        expCtx.globalAlpha = 1;
+
+        if (particles.length > 0 || shockwaves.length > 0 || flashAlpha > 0.01) {
+          animFrameId = requestAnimationFrame(renderExplosionLoop);
+        } else {
+          animFrameId = null;
+          expCtx.clearRect(0, 0, explosionCanvas.width, explosionCanvas.height);
+        }
+      }
+
+      // ==================== 遊戲初始化與渲染 ====================
+      function initGame(diffKey = currentDiffKey) {
+        currentDiffKey = diffKey;
+        const config = getDifficultyConfig(diffKey);
+        rows = config.rows;
+        cols = config.cols;
+        totalMines = config.mines;
+
+        updateDifficultyButtonLabels();
+
+        diffBtns.forEach((btn) => {
+          btn.classList.toggle("active", btn.dataset.diff === diffKey);
+        });
+        diffTagEl.textContent = config.label;
+
+        clearInterval(timerInterval);
+        timerInterval = null;
+        clearTimeout(frogMouthTimeout);
+
+        gameState = "idle";
+        steps = 0;
+        flagsPlaced = 0;
+        revealedCount = 0;
+        timerSeconds = 0;
+
+        setFrogState("idle");
+        updateHUD();
+        hideBanner();
+        setHintMessage("卡關了嗎？隨時點擊「<strong>智慧提示 ∞</strong>」，青蛙會幫你找出安全格或地雷位置！", "normal");
+
+        board = Array.from({ length: rows }, (_, r) =>
+          Array.from({ length: cols }, (_, c) => ({
+            r,
+            c,
+            isMine: false,
+            isRevealed: false,
+            isFlagged: false,
+            neighborMines: 0,
+            el: null
+          }))
+        );
+
+        renderGrid();
+      }
+
+      function renderGrid() {
+        mineGrid.innerHTML = "";
+        mineGrid.style.gridTemplateColumns = `repeat(${cols}, var(--cell-size))`;
+
+        const fragment = document.createDocumentFragment();
+
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const cell = board[r][c];
+            const div = document.createElement("div");
+            div.className = "cell";
+            div.dataset.r = r;
+            div.dataset.c = c;
+            div.setAttribute("role", "gridcell");
+
+            // 阻止手機長按彈出系統選單
+            div.addEventListener("contextmenu", (e) => {
+              e.preventDefault();
+            });
+
+            // 獨立且完整的觸控/滑鼠交互控制，確保長按與插旗模式可無限次連續使用
+            let pressTimer = null;
+            let longPressTriggered = false;
+            let activePointerId = null;
+            let startX = 0;
+            let startY = 0;
+
+            const resetPointerState = () => {
+              if (pressTimer !== null) {
+                clearTimeout(pressTimer);
+                pressTimer = null;
+              }
+              activePointerId = null;
+            };
+
+            div.addEventListener("pointerdown", (e) => {
+              // 滑鼠右鍵直接切換插旗
+              if (e.pointerType === "mouse" && e.button === 2) {
+                e.preventDefault();
+                resetPointerState();
+                longPressTriggered = false;
+                handleCellFlagAction(r, c);
+                return;
+              }
+
+              // 僅接受主鍵或觸控
+              if (e.pointerType === "mouse" && e.button !== 0) return;
+
+              resetPointerState();
+              longPressTriggered = false;
+              activePointerId = e.pointerId;
+              startX = e.clientX;
+              startY = e.clientY;
+
+              // 觸控裝置在未開啟插旗模式時，長按 350ms 可直接插旗/取消旗幟
+              if (e.pointerType !== "mouse" && !flagMode) {
+                pressTimer = setTimeout(() => {
+                  pressTimer = null;
+                  longPressTriggered = true;
+                  handleCellFlagAction(r, c);
+                }, 350);
+              }
+            });
+
+            div.addEventListener("pointermove", (e) => {
+              if (activePointerId !== e.pointerId || pressTimer === null) return;
+              if (Math.hypot(e.clientX - startX, e.clientY - startY) > 10) {
+                resetPointerState();
+              }
+            });
+
+            div.addEventListener("pointerup", (e) => {
+              if (activePointerId !== e.pointerId) return;
+              const wasLongPressed = longPressTriggered;
+              resetPointerState();
+              longPressTriggered = false;
+
+              if (e.pointerType === "mouse" && e.button !== 0) return;
+              if (!wasLongPressed) {
+                handleCellPrimaryAction(r, c);
+              }
+            });
+
+            div.addEventListener("pointercancel", () => {
+              resetPointerState();
+              longPressTriggered = false;
+            });
+
+            cell.el = div;
+            fragment.appendChild(div);
+          }
+        }
+
+        mineGrid.appendChild(fragment);
+        requestAnimationFrame(calculateOptimalCellSize);
+      }
+
+      // 首步安全佈雷（避開點擊格及周圍 8 格）
+      function placeMinesSafe(safeR, safeC) {
+        const forbidden = new Set();
+        for (let dr = -1; dr <= 1; dr++) {
+          for (let dc = -1; dc <= 1; dc++) {
+            const nr = safeR + dr;
+            const nc = safeC + dc;
+            if (isValid(nr, nc)) {
+              forbidden.add(`${nr},${nc}`);
+            }
+          }
+        }
+
+        let placed = 0;
+        while (placed < totalMines) {
+          const r = Math.floor(Math.random() * rows);
+          const c = Math.floor(Math.random() * cols);
+          const key = `${r},${c}`;
+          if (!forbidden.has(key) && !board[r][c].isMine) {
+            board[r][c].isMine = true;
+            placed++;
+          }
+        }
+
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            if (!board[r][c].isMine) {
+              board[r][c].neighborMines = getNeighbors(r, c).filter((n) => n.isMine).length;
+            }
+          }
+        }
+      }
+
+      function isValid(r, c) {
+        return r >= 0 && r < rows && c >= 0 && c < cols;
+      }
+
+      function getNeighbors(r, c) {
+        const list = [];
+        for (let dr = -1; dr <= 1; dr++) {
+          for (let dc = -1; dc <= 1; dc++) {
+            if (dr === 0 && dc === 0) continue;
+            const nr = r + dr;
+            const nc = c + dc;
+            if (isValid(nr, nc)) {
+              list.push(board[nr][nc]);
+            }
+          }
+        }
+        return list;
+      }
+
+      function startTimer() {
+        if (timerInterval) return;
+        timerInterval = setInterval(() => {
+          timerSeconds = Math.min(999, timerSeconds + 1);
+          timerDisplayEl.textContent = String(timerSeconds).padStart(3, "0");
+        }, 1000);
+      }
+
+      function updateHUD() {
+        stepCountEl.textContent = String(steps).padStart(3, "0");
+        minesLeftEl.textContent = totalMines - flagsPlaced;
+        timerDisplayEl.textContent = String(timerSeconds).padStart(3, "0");
+      }
+
+      function clearHintHighlights() {
+        document.querySelectorAll(".hint-safe, .hint-mine").forEach((el) => {
+          el.classList.remove("hint-safe", "hint-mine");
+        });
+      }
+
+      // ==================== 玩家操作邏輯 ====================
+      function handleCellPrimaryAction(r, c) {
+        if (gameState === "won" || gameState === "lost") return;
+
+        const cell = board[r][c];
+        clearHintHighlights();
+
+        // 若點擊已翻開的數字格 -> 快速展開（Chording）
+        if (cell.isRevealed) {
+          if (cell.neighborMines > 0) {
+            const neighbors = getNeighbors(r, c);
+            const flaggedNeighbors = neighbors.filter((n) => n.isFlagged).length;
+            const hiddenUnflagged = neighbors.filter((n) => !n.isRevealed && !n.isFlagged);
+
+            if (flaggedNeighbors === cell.neighborMines && hiddenUnflagged.length > 0) {
+              steps++;
+              updateHUD();
+              triggerFrogStepMouth();
+              playSound("step");
+
+              for (const target of hiddenUnflagged) {
+                revealCell(target.r, target.c);
+                if (gameState === "lost") break;
+              }
+              checkWinCondition();
+            }
+          }
+          return;
+        }
+
+        // 插旗模式開啟時：每次點擊都直接切換插旗／取消插旗
+        if (flagMode) {
+          handleCellFlagAction(r, c);
+          return;
+        }
+
+        if (cell.isFlagged) return;
+
+        if (gameState === "idle") {
+          gameState = "playing";
+          placeMinesSafe(r, c);
+          startTimer();
+        }
+
+        steps++;
+        updateHUD();
+        triggerFrogStepMouth();
+        playSound("step");
+
+        revealCell(r, c);
+        if (gameState !== "lost") {
+          checkWinCondition();
+        }
+      }
+
+      function handleCellFlagAction(r, c) {
+        if (gameState === "won" || gameState === "lost") return;
+        const cell = board[r][c];
+        if (cell.isRevealed) return;
+
+        clearHintHighlights();
+
+        if (gameState === "idle") {
+          gameState = "playing";
+          placeMinesSafe(r, c);
+          startTimer();
+        }
+
+        cell.isFlagged = !cell.isFlagged;
+        flagsPlaced += cell.isFlagged ? 1 : -1;
+
+        steps++;
+        updateHUD();
+        triggerFrogStepMouth();
+        playSound("flag");
+
+        if (cell.isFlagged) {
+          cell.el.classList.add("flagged");
+          cell.el.innerHTML = `<span style="font-size:calc(var(--cell-size) * 0.56);line-height:1;">🚩</span>`;
+        } else {
+          cell.el.classList.remove("flagged");
+          cell.el.innerHTML = "";
+        }
+      }
+
+      function revealCell(r, c) {
+        const cell = board[r][c];
+        if (cell.isRevealed || cell.isFlagged) return;
+
+        cell.isRevealed = true;
+        cell.el.classList.add("revealed");
+
+        if (cell.isMine) {
+          triggerGameOver(cell);
+          return;
+        }
+
+        revealedCount++;
+
+        if (cell.neighborMines > 0) {
+          cell.el.classList.add("has-number", `num-${cell.neighborMines}`);
+          cell.el.textContent = cell.neighborMines;
+        } else {
+          const neighbors = getNeighbors(r, c);
+          for (const n of neighbors) {
+            if (!n.isRevealed && !n.isFlagged) {
+              revealCell(n.r, n.c);
+            }
+          }
+        }
+      }
+
+      // ==================== 勝負判定與爆炸處理 ====================
+      function triggerGameOver(explodedCell) {
+        gameState = "lost";
+        clearInterval(timerInterval);
+        clearTimeout(frogMouthTimeout);
+
+        setFrogState("shocked");
+        playSound("boom");
+
+        const rect = explodedCell.el.getBoundingClientRect();
+        triggerExplosionEffect(rect.left + rect.width / 2, rect.top + rect.height / 2);
+
+        explodedCell.el.classList.add("mine-exploded");
+        explodedCell.el.innerHTML = `<span style="font-size:calc(var(--cell-size) * 0.6);">💥</span>`;
+
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const cell = board[r][c];
+            if (cell === explodedCell) continue;
+
+            if (cell.isMine && !cell.isFlagged) {
+              cell.el.classList.add("revealed", "mine-revealed");
+              cell.el.innerHTML = `<span style="font-size:calc(var(--cell-size) * 0.54);">💣</span>`;
+            } else if (!cell.isMine && cell.isFlagged) {
+              cell.el.classList.add("flag-wrong");
+              cell.el.innerHTML = `<span style="font-size:calc(var(--cell-size) * 0.54);">❌</span>`;
+            }
+          }
+        }
+
+        showBanner("💥 碰！踩到地雷了！點擊震驚的青蛙再挑戰一次吧！", "gameover");
+        setHintMessage("<strong>Game Over！</strong> 青蛙嚇壞了，點擊上方青蛙頭像即可重新開始。", "danger");
+      }
+
+      function checkWinCondition() {
+        const safeTotal = rows * cols - totalMines;
+        if (revealedCount === safeTotal && gameState !== "lost") {
+          gameState = "won";
+          clearInterval(timerInterval);
+          clearTimeout(frogMouthTimeout);
+
+          for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+              const cell = board[r][c];
+              if (cell.isMine && !cell.isFlagged) {
+                cell.isFlagged = true;
+                flagsPlaced++;
+                cell.el.classList.add("flagged");
+                cell.el.innerHTML = `<span style="font-size:calc(var(--cell-size) * 0.56);">🚩</span>`;
+              }
+            }
+          }
+          updateHUD();
+
+          setFrogState("win");
+          playSound("win");
+          showBanner(`🎉 恭喜過關！共使用 ${steps} 步、耗時 ${timerSeconds} 秒！`, "victory");
+          setHintMessage(`<strong>太神啦！</strong> 完美掃清所有地雷，青蛙戴上了勝利墨鏡！`, "normal");
+        }
+      }
+
+      function showBanner(text, type) {
+        gameBanner.textContent = text;
+        gameBanner.className = `game-banner show ${type}`;
+      }
+
+      function hideBanner() {
+        gameBanner.className = "game-banner";
+        gameBanner.textContent = "";
+      }
+
+      function setHintMessage(html, tone = "normal") {
+        hintStatusBox.className = "hint-status-box";
+        if (tone === "warn") hintStatusBox.classList.add("warn");
+        if (tone === "danger") hintStatusBox.classList.add("danger");
+        hintStatusBox.innerHTML = `<span>${html}</span>`;
+      }
+
+      // ==================== 無限次智慧提示演算法 ====================
+      function provideUnlimitedHint() {
+        if (gameState === "won" || gameState === "lost") {
+          setHintMessage("本局已結束，請先點擊<strong>青蛙</strong>或<strong>重新開始</strong>開啟新局！", "warn");
+          return;
+        }
+
+        clearHintHighlights();
+
+        if (gameState === "idle") {
+          const midR = Math.floor(rows / 2);
+          const midC = Math.floor(cols / 2);
+          const target = board[midR][midC];
+          highlightHintCell(target, "safe");
+          playSound("hint");
+          triggerFrogStepMouth();
+          setHintMessage(`<strong>開局提示：</strong> 已為你標出中央發光格（第 ${midR + 1} 列, 第 ${midC + 1} 欄），首步保證安全！`);
+          return;
+        }
+
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const cell = board[r][c];
+            if (!cell.isRevealed || cell.neighborMines === 0) continue;
+
+            const neighbors = getNeighbors(r, c);
+            const flagged = neighbors.filter((n) => n.isFlagged);
+            const hidden = neighbors.filter((n) => !n.isRevealed && !n.isFlagged);
+
+            if (hidden.length === 0) continue;
+
+            if (flagged.length === cell.neighborMines) {
+              const safeCell = hidden[0];
+              highlightHintCell(safeCell, "safe");
+              playSound("hint");
+              triggerFrogStepMouth();
+              setHintMessage(
+                `<strong>邏輯安全格：</strong> 根據 (${r + 1},${c + 1}) 的數字「${cell.neighborMines}」，綠色發光格必定安全可翻開！`
+              );
+              return;
+            }
+
+            if (flagged.length + hidden.length === cell.neighborMines) {
+              const mineCell = hidden[0];
+              highlightHintCell(mineCell, "mine");
+              playSound("hint");
+              triggerFrogStepMouth();
+              setHintMessage(
+                `<strong>邏輯地雷格：</strong> 根據 (${r + 1},${c + 1}) 的數字「${cell.neighborMines}」，黃色發光格必定是地雷，請插旗標記！`,
+                "warn"
+              );
+              return;
+            }
+          }
+        }
+
+        const safeCandidates = [];
+        const frontierSafe = [];
+
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const cell = board[r][c];
+            if (!cell.isRevealed && !cell.isFlagged && !cell.isMine) {
+              safeCandidates.push(cell);
+              const hasRevealedNeighbor = getNeighbors(r, c).some((n) => n.isRevealed);
+              if (hasRevealedNeighbor) {
+                frontierSafe.push(cell);
+              }
+            }
+          }
+        }
+
+        const pool = frontierSafe.length > 0 ? frontierSafe : safeCandidates;
+        if (pool.length > 0) {
+          const chosen = pool[Math.floor(Math.random() * pool.length)];
+          highlightHintCell(chosen, "safe");
+          playSound("hint");
+          triggerFrogStepMouth();
+          setHintMessage(
+            `<strong>直覺安全提示：</strong> 目前盤面需要突破口，青蛙感應到綠色發光格（第 ${chosen.r + 1} 列, 第 ${chosen.c + 1} 欄）是安全的！`
+          );
+        }
+      }
+
+      function highlightHintCell(cell, type) {
+        if (!cell || !cell.el) return;
+        cell.el.classList.add(type === "safe" ? "hint-safe" : "hint-mine");
+        cell.el.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+      }
+
+      // ==================== 事件監聽綁定 ====================
+      diffBtns.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          initGame(btn.dataset.diff);
+        });
+      });
+
+      frogBtn.addEventListener("click", () => {
+        initGame(currentDiffKey);
+      });
+
+      restartBtn.addEventListener("click", () => {
+        initGame(currentDiffKey);
+      });
+
+      hintBtn.addEventListener("click", () => {
+        provideUnlimitedHint();
+      });
+
+      flagModeBtn.addEventListener("click", () => {
+        flagMode = !flagMode;
+        flagModeBtn.classList.toggle("active", flagMode);
+        flagModeBtn.setAttribute("aria-pressed", String(flagMode));
+        flagModeLabel.textContent = flagMode ? "🚩 插旗模式" : "⛏️ 挖掘模式";
+        flagModeState.textContent = flagMode ? "插旗中" : "點擊切換";
+        playSound("flag");
+      });
+
+      soundBtn.addEventListener("click", () => {
+        soundEnabled = !soundEnabled;
+        soundState.textContent = soundEnabled ? "開啟" : "靜音";
+        if (soundEnabled) playSound("step");
+      });
+
+      // 啟動預設初級遊戲
+      initGame("beginner");
+    })();
+  </script>
+</body>
+</html>

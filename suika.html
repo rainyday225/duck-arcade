@@ -1,0 +1,1800 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>合成大西瓜 - 可愛水果派對</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Noto+Sans+TC:wght@500;700;900&display=swap');
+
+        :root {
+            --bg-cream: #FFF8EE;
+            --wood-light: #F3D5B5;
+            --wood-border: #D4A373;
+            --wood-dark: #A47148;
+            --accent-pink: #FF758F;
+            --accent-green: #52B788;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Fredoka', 'Noto Sans TC', sans-serif;
+            background: radial-gradient(circle at 50% 20%, #FFFDF9 0%, #FDEBD2 100%);
+            color: #5C4033;
+            height: 100dvh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* 可愛果園背景裝飾紋理 */
+        .bg-pattern {
+            position: fixed;
+            inset: 0;
+            background-image: radial-gradient(#E6CCB2 1.5px, transparent 1.5px);
+            background-size: 28px 28px;
+            opacity: 0.45;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* 頂部資訊欄 */
+        .top-hud {
+            width: 100%;
+            max-width: 480px;
+            padding: 10px 14px 4px;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .hud-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .wood-card {
+            background: rgba(255, 255, 255, 0.88);
+            border: 2.5px solid #E6CCB2;
+            border-radius: 16px;
+            box-shadow: 0 4px 0 #DDB892;
+            padding: 4px 12px;
+            backdrop-filter: blur(4px);
+        }
+
+        .btn-cute {
+            background: linear-gradient(180deg, #FFFFFF 0%, #FFF1E6 100%);
+            border: 2.5px solid #DDA15E;
+            border-radius: 14px;
+            box-shadow: 0 3px 0 #BC6C25;
+            color: #6F4E37;
+            font-weight: 700;
+            transition: transform 0.08s ease, box-shadow 0.08s ease;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        .btn-cute:active {
+            transform: translateY(3px);
+            box-shadow: 0 0 0 #BC6C25;
+        }
+
+        .btn-primary {
+            background: linear-gradient(180deg, #FF8FA3 0%, #FF4D6D 100%);
+            border: 2.5px solid #C9184A;
+            box-shadow: 0 4px 0 #A4133C;
+            color: white;
+        }
+
+        .btn-primary:active {
+            box-shadow: 0 0 0 #A4133C;
+        }
+
+        .btn-green {
+            background: linear-gradient(180deg, #74C69D 0%, #40916C 100%);
+            border: 2.5px solid #2D6A4F;
+            box-shadow: 0 4px 0 #1B4332;
+            color: white;
+        }
+
+        /* 遊戲主容器 */
+        .game-stage {
+            position: relative;
+            flex: 1;
+            width: 100%;
+            max-width: 460px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px 12px;
+            z-index: 5;
+            min-height: 0;
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            max-height: 640px;
+            border-radius: 22px;
+            background: linear-gradient(180deg, rgba(255, 250, 240, 0.72) 0%, rgba(250, 232, 206, 0.92) 100%);
+            border: 5px solid #C68B59;
+            box-shadow:
+                inset 0 0 24px rgba(198, 139, 89, 0.25),
+                0 10px 25px rgba(139, 90, 43, 0.2),
+                0 6px 0 #9C6644;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        canvas#gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        /* 底部進化表列 */
+        .bottom-evo {
+            width: 100%;
+            max-width: 480px;
+            padding: 4px 12px 10px;
+            z-index: 10;
+        }
+
+        .evo-bar {
+            background: rgba(255, 255, 255, 0.85);
+            border: 2px solid #E6CCB2;
+            border-radius: 16px;
+            padding: 5px 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 3px 0 #DDB892;
+        }
+
+        /* 彈窗樣式 */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(62, 39, 35, 0.55);
+            backdrop-filter: blur(4px);
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .modal-backdrop.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-box {
+            background: #FFFDF9;
+            border: 4px solid #D4A373;
+            border-radius: 26px;
+            box-shadow: 0 10px 0 #9C6644, 0 20px 40px rgba(0,0,0,0.25);
+            width: 100%;
+            max-width: 400px;
+            padding: 20px;
+            transform: scale(0.92);
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+            max-height: 88dvh;
+            overflow-y: auto;
+        }
+
+        .modal-backdrop.active .modal-box {
+            transform: scale(1);
+        }
+
+        /* 警戒線閃爍動畫 */
+        @keyframes pulseDanger {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.65; transform: scale(1.05); }
+        }
+        .danger-badge {
+            animation: pulseDanger 0.6s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-pattern"></div>
+
+    <!-- 頂部資訊列 -->
+    <header class="top-hud">
+        <div class="hud-row">
+            <!-- 分數區 -->
+            <div class="wood-card flex items-center gap-3 flex-1">
+                <div>
+                    <div class="text-[11px] font-bold text-amber-800/70 leading-tight">目前分數</div>
+                    <div id="scoreDisplay" class="text-2xl font-black text-amber-900 leading-none tracking-tight">0</div>
+                </div>
+                <div class="h-7 w-[2px] bg-amber-200 rounded-full"></div>
+                <div>
+                    <div class="text-[11px] font-bold text-amber-800/70 leading-tight">最高紀錄</div>
+                    <div id="bestScoreDisplay" class="text-lg font-extrabold text-rose-500 leading-none">0</div>
+                </div>
+            </div>
+
+            <!-- 下一個水果預覽 -->
+            <div class="wood-card flex items-center gap-2 py-1 px-3">
+                <span class="text-xs font-extrabold text-amber-900">下一個</span>
+                <canvas id="nextCanvas" width="44" height="44" class="w-10 h-10"></canvas>
+            </div>
+        </div>
+
+        <!-- 功能按鈕列 -->
+        <div class="hud-row">
+            <div class="flex items-center gap-1.5">
+                <button id="btnLeaderboard" class="btn-cute px-2.5 py-1.5 text-xs sm:text-sm" title="查看排行榜">
+                    <span>🏆</span><span>排行榜</span>
+                </button>
+                <button id="btnGuide" class="btn-cute px-2.5 py-1.5 text-xs sm:text-sm" title="合成表說明">
+                    <span>🍉</span><span>圖鑑</span>
+                </button>
+            </div>
+
+            <!-- 警戒倒數提示膠囊 -->
+            <div id="dangerBanner" class="hidden danger-badge bg-rose-500 text-white text-xs font-black px-2.5 py-1 rounded-full shadow">
+                ⚠️ 危險！<span id="dangerTimerText">2.5</span>s
+            </div>
+
+            <div class="flex items-center gap-1.5">
+                <button id="btnSound" class="btn-cute px-2.5 py-1.5 text-xs sm:text-sm" title="切換音效">
+                    <span id="soundIcon">🔊</span><span id="soundLabel" class="hidden sm:inline">音效開</span>
+                </button>
+                <button id="btnRestart" class="btn-cute px-2.5 py-1.5 text-xs sm:text-sm" title="重新開始">
+                    <span>🔄</span><span class="hidden sm:inline">重來</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 遊戲主畫布區 -->
+    <main class="game-stage">
+        <div class="canvas-wrapper" id="canvasContainer">
+            <canvas id="gameCanvas"></canvas>
+        </div>
+    </main>
+
+    <!-- 底部進化順序條 -->
+    <footer class="bottom-evo">
+        <div class="evo-bar" id="evoBarContainer" title="點擊查看完整水果進化表">
+            <!-- 由 JS 動態繪製迷你進化順序 -->
+        </div>
+    </footer>
+
+    <!-- 1. Game Over 結算與排行榜登錄彈窗 -->
+    <div id="gameOverModal" class="modal-backdrop">
+        <div class="modal-box text-center">
+            <div class="text-4xl mb-1">🍉✨</div>
+            <h2 class="text-2xl font-black text-amber-900">遊戲結束！</h2>
+            <p class="text-xs font-bold text-amber-700/80 mb-3">水果滿出木箱警戒線啦～</p>
+
+            <div class="bg-amber-50 border-2 border-amber-200 rounded-2xl p-3 mb-3">
+                <div class="text-xs font-bold text-amber-700">本次最終得分</div>
+                <div id="finalScoreText" class="text-4xl font-black text-rose-500 my-0.5">0</div>
+                <div id="newRecordBadge" class="hidden inline-block bg-amber-400 text-amber-950 text-xs font-black px-2.5 py-0.5 rounded-full mt-1">
+                    🎉 破個人最高紀錄！
+                </div>
+            </div>
+
+            <!-- 登錄排行榜區塊 -->
+            <div id="saveScoreSection" class="bg-rose-50/80 border-2 border-rose-200 rounded-2xl p-3 mb-4 text-left">
+                <div class="text-xs font-black text-rose-600 mb-1.5 flex items-center justify-between">
+                    <span>🏆 登上本地高分榜！</span>
+                    <span id="rankPreviewText" class="bg-rose-500 text-white px-2 py-0.5 rounded-full text-[11px]">第 1 名</span>
+                </div>
+                <div class="flex gap-2">
+                    <input type="text" id="playerNameInput" maxlength="10" placeholder="輸入你的可愛暱稱"
+                        class="flex-1 bg-white border-2 border-amber-300 rounded-xl px-3 py-1.5 text-sm font-bold text-amber-950 focus:outline-none focus:border-rose-400">
+                    <button id="btnSaveScore" class="btn-cute btn-green px-3.5 py-1.5 text-sm whitespace-nowrap">
+                        儲存成績
+                    </button>
+                </div>
+                <div id="saveConfirmMsg" class="hidden text-xs font-bold text-emerald-600 mt-1.5 text-center">
+                    ✅ 已成功登錄至排行榜！
+                </div>
+            </div>
+
+            <div class="flex gap-2.5">
+                <button id="btnOpenBoardFromOver" class="btn-cute flex-1 py-2.5 text-sm">
+                    🏆 查看排行榜
+                </button>
+                <button id="btnPlayAgain" class="btn-cute btn-primary flex-1 py-2.5 text-sm">
+                    🍉 再玩一局
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. 本地排行榜彈窗 -->
+    <div id="leaderboardModal" class="modal-backdrop">
+        <div class="modal-box">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-xl font-black text-amber-900 flex items-center gap-1.5">
+                    <span>🏆</span><span>果園榮譽排行榜</span>
+                </h2>
+                <button id="btnCloseLeaderboard" class="btn-cute w-8 h-8 rounded-full text-sm">✕</button>
+            </div>
+
+            <div id="leaderboardList" class="space-y-2 max-h-[52dvh] overflow-y-auto pr-1">
+                <!-- 由 JS 動態產生排行列表 -->
+            </div>
+
+            <div class="mt-4 pt-3 border-t-2 border-amber-100 flex items-center justify-between gap-2">
+                <button id="btnClearBoard" class="text-xs font-bold text-amber-700/70 hover:text-rose-500 px-2 py-1 rounded-lg transition">
+                    🗑️ 清除本機紀錄
+                </button>
+                <button id="btnCloseLeaderboardBottom" class="btn-cute btn-primary px-5 py-2 text-sm">
+                    返回遊戲
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. 水果合成進化圖鑑彈窗 -->
+    <div id="guideModal" class="modal-backdrop">
+        <div class="modal-box">
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="text-xl font-black text-amber-900">🍓 水果合成進化表</h2>
+                <button id="btnCloseGuide" class="btn-cute w-8 h-8 rounded-full text-sm">✕</button>
+            </div>
+            <p class="text-xs font-bold text-amber-800/80 mb-3">
+                左右滑動調整位置，放開即可落下！兩顆相同水果碰在一起就會進化成更大的水果並加倍得分！
+            </p>
+            <div id="guideGrid" class="grid grid-cols-2 gap-2 max-h-[52dvh] overflow-y-auto pr-1">
+                <!-- 由 JS 動態產生圖鑑卡片 -->
+            </div>
+            <button id="btnCloseGuideBottom" class="btn-cute btn-primary w-full py-2.5 text-sm mt-4">
+                我知道了，開始合成！
+            </button>
+        </div>
+    </div>
+
+    <!-- 自訂確認清除對話框（不使用原生 confirm/alert） -->
+    <div id="confirmClearModal" class="modal-backdrop">
+        <div class="modal-box text-center max-w-xs">
+            <div class="text-3xl mb-2">🗑️</div>
+            <h3 class="text-lg font-black text-amber-900 mb-1">確定要清除排行榜嗎？</h3>
+            <p class="text-xs font-bold text-amber-700/80 mb-4">清除後所有本機高分紀錄將無法復原喔！</p>
+            <div class="flex gap-2">
+                <button id="btnCancelClear" class="btn-cute flex-1 py-2 text-sm">取消</button>
+                <button id="btnConfirmClear" class="btn-cute btn-primary flex-1 py-2 text-sm">確定清除</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    /**
+     * ============================================================================
+     * 1. Web Audio API 可愛水滴與合成音效引擎 (100% 離線即時合成)
+     * ============================================================================
+     */
+    class SoundEngine {
+        constructor() {
+            this.ctx = null;
+            this.enabled = true;
+            // 五聲音階與大調上升頻率表（讓每次合成倍大都有清脆悅耳的音階感）
+            this.scaleNotes = [
+                523.25, // C5 (藍莓->草莓)
+                587.33, // D5 (草莓->檸檬)
+                659.25, // E5 (檸檬->橙子)
+                783.99, // G5 (橙子->蘋果)
+                880.00, // A5 (蘋果->水蜜桃)
+                1046.50,// C6 (水蜜桃->鳳梨)
+                1174.66,// D6 (鳳梨->椰子)
+                1318.51,// E6 (椰子->哈密瓜)
+                1567.98 // G6 (哈密瓜->大西瓜)
+            ];
+        }
+
+        init() {
+            if (!this.ctx) {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (AudioCtx) {
+                    this.ctx = new AudioCtx();
+                }
+            }
+            if (this.ctx && this.ctx.state === 'suspended') {
+                this.ctx.resume();
+            }
+        }
+
+        toggle() {
+            this.enabled = !this.enabled;
+            if (this.enabled) this.init();
+            return this.enabled;
+        }
+
+        // 投放水果時的輕柔氣泡「啵」聲
+        playDrop() {
+            if (!this.enabled) return;
+            this.init();
+            if (!this.ctx) return;
+
+            const now = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(340, now);
+            osc.frequency.exponentialRampToValueAtTime(520, now + 0.08);
+
+            gain.gain.setValueAtTime(0.18, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+
+            osc.start(now);
+            osc.stop(now + 0.095);
+        }
+
+        // 水果碰撞的輕微軟Q彈跳聲
+        playBounce(intensity = 0.5) {
+            if (!this.enabled || intensity < 0.15) return;
+            this.init();
+            if (!this.ctx) return;
+
+            const now = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+
+            osc.type = 'triangle';
+            const baseFreq = 160 + Math.random() * 60;
+            osc.frequency.setValueAtTime(baseFreq, now);
+            osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.65, now + 0.05);
+
+            const vol = Math.min(0.1, intensity * 0.08);
+            gain.gain.setValueAtTime(vol, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.055);
+
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+
+            osc.start(now);
+            osc.stop(now + 0.06);
+        }
+
+        // 合成倍大時的清脆可愛「水滴音 (Water Drop)」+ 連擊升調
+        playMerge(newLevel, combo = 1) {
+            if (!this.enabled) return;
+            this.init();
+            if (!this.ctx) return;
+
+            const now = this.ctx.currentTime;
+            const baseFreq = this.scaleNotes[Math.min(newLevel - 1, this.scaleNotes.length - 1)] || 600;
+            const comboShift = Math.min((combo - 1) * 45, 220);
+            const targetFreq = baseFreq + comboShift;
+
+            // 主水滴聲：頻率快速向上滑動模擬水滴落入水面的清脆感
+            const osc1 = this.ctx.createOscillator();
+            const gain1 = this.ctx.createGain();
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(targetFreq * 0.62, now);
+            osc1.frequency.exponentialRampToValueAtTime(targetFreq * 1.35, now + 0.11);
+            osc1.frequency.exponentialRampToValueAtTime(targetFreq * 1.15, now + 0.19);
+
+            gain1.gain.setValueAtTime(0.01, now);
+            gain1.gain.linearRampToValueAtTime(0.32, now + 0.02);
+            gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+
+            osc1.connect(gain1);
+            gain1.connect(this.ctx.destination);
+            osc1.start(now);
+            osc1.stop(now + 0.23);
+
+            // 泛音水花點綴（等級越高越豐富）
+            const osc2 = this.ctx.createOscillator();
+            const gain2 = this.ctx.createGain();
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(targetFreq * 1.5, now + 0.045);
+            osc2.frequency.exponentialRampToValueAtTime(targetFreq * 2.0, now + 0.18);
+
+            gain2.gain.setValueAtTime(0.001, now + 0.045);
+            gain2.gain.linearRampToValueAtTime(0.18, now + 0.065);
+            gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+
+            osc2.connect(gain2);
+            gain2.connect(this.ctx.destination);
+            osc2.start(now + 0.045);
+            osc2.stop(now + 0.25);
+
+            // 如果合成出最大等級「大西瓜」(Level 9)，播放歡快勝利和弦！
+            if (newLevel === 9) {
+                this.playWatermelonFanfare();
+            }
+        }
+
+        // 合成出大西瓜時的歡快和弦
+        playWatermelonFanfare() {
+            if (!this.enabled || !this.ctx) return;
+            const now = this.ctx.currentTime + 0.12;
+            const chord = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+            chord.forEach((freq, idx) => {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                const t = now + idx * 0.065;
+                osc.frequency.setValueAtTime(freq, t);
+
+                gain.gain.setValueAtTime(0.001, t);
+                gain.gain.linearRampToValueAtTime(0.22, t + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(t);
+                osc.stop(t + 0.46);
+            });
+        }
+
+        // Game Over 柔和提示音
+        playGameOver() {
+            if (!this.enabled) return;
+            this.init();
+            if (!this.ctx) return;
+
+            const now = this.ctx.currentTime;
+            const notes = [440, 392, 349.23, 293.66];
+            notes.forEach((freq, i) => {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                const t = now + i * 0.14;
+                osc.frequency.setValueAtTime(freq, t);
+                gain.gain.setValueAtTime(0.2, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(t);
+                osc.stop(t + 0.3);
+            });
+        }
+    }
+
+    const soundFX = new SoundEngine();
+
+    /**
+     * ============================================================================
+     * 2. 10種可愛水果定義與精細 Canvas 表情繪製器
+     *    包含：藍莓、草莓、檸檬、橙子、蘋果、水蜜桃、鳳梨、椰子、哈密瓜、大西瓜
+     * ============================================================================
+     */
+    const FRUITS = [
+        {
+            level: 0,
+            name: '藍莓',
+            radius: 17,
+            score: 2,
+            color: '#4361EE',
+            border: '#2B3A99',
+            highlight: '#90E0EF',
+            cheek: '#FF8FA3',
+            faceType: 'happy'
+        },
+        {
+            level: 1,
+            name: '草莓',
+            radius: 24,
+            score: 4,
+            color: '#FF4D6D',
+            border: '#B5173B',
+            highlight: '#FFB3C1',
+            cheek: '#FFD166',
+            faceType: 'wink'
+        },
+        {
+            level: 2,
+            name: '檸檬',
+            radius: 31,
+            score: 8,
+            color: '#FFD60A',
+            border: '#C9A200',
+            highlight: '#FFF3B0',
+            cheek: '#FF8FA3',
+            faceType: 'sour'
+        },
+        {
+            level: 3,
+            name: '橙子',
+            radius: 39,
+            score: 16,
+            color: '#FF8500',
+            border: '#C25900',
+            highlight: '#FFD099',
+            cheek: '#FF4D6D',
+            faceType: 'smile'
+        },
+        {
+            level: 4,
+            name: '蘋果',
+            radius: 48,
+            score: 32,
+            color: '#E63946',
+            border: '#9B1C26',
+            highlight: '#FFA5AB',
+            cheek: '#FFD166',
+            faceType: 'sparkle'
+        },
+        {
+            level: 5,
+            name: '水蜜桃',
+            radius: 58,
+            score: 64,
+            color: '#FF9EBB',
+            border: '#D95D82',
+            highlight: '#FFE5EC',
+            cheek: '#FF477E',
+            faceType: 'shy'
+        },
+        {
+            level: 6,
+            name: '鳳梨',
+            radius: 69,
+            score: 128,
+            color: '#F4A261',
+            border: '#B5651D',
+            highlight: '#FDE4CF',
+            cheek: '#E76F51',
+            faceType: 'cool'
+        },
+        {
+            level: 7,
+            name: '椰子',
+            radius: 81,
+            score: 256,
+            color: '#7F5539',
+            border: '#4A2E1B',
+            highlight: '#B08968',
+            cheek: '#FF8FA3',
+            faceType: 'surprised'
+        },
+        {
+            level: 8,
+            name: '哈密瓜',
+            radius: 95,
+            score: 512,
+            color: '#A7C957',
+            border: '#588157',
+            highlight: '#E9F5DB',
+            cheek: '#FF758F',
+            faceType: 'bliss'
+        },
+        {
+            level: 9,
+            name: '大西瓜',
+            radius: 112,
+            score: 1024,
+            color: '#38B000',
+            border: '#1B5E20',
+            highlight: '#9EF01A',
+            cheek: '#FF4D6D',
+            faceType: 'king'
+        }
+    ];
+
+    /**
+     * 在指定 Canvas Context 上繪製一顆帶有細節紋理與可愛表情的水果
+     */
+    function drawCuteFruit(ctx, level, x, y, angle = 0, scaleX = 1, scaleY = 1, customRadius = null) {
+        const f = FRUITS[level];
+        if (!f) return;
+        const r = customRadius !== null ? customRadius : f.radius;
+
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.scale(scaleX, scaleY);
+
+        // 1. 繪製果實主體底色與漸層
+        const grad = ctx.createRadialGradient(-r * 0.28, -r * 0.28, r * 0.1, 0, 0, r);
+        grad.addColorStop(0, f.highlight);
+        grad.addColorStop(0.45, f.color);
+        grad.addColorStop(1, f.border);
+
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        // 2. 各水果專屬特徵紋理（在圓形裁切內繪製）
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(0, 0, r - 1, 0, Math.PI * 2);
+        ctx.clip();
+
+        if (level === 0) {
+            // 藍莓頂部小皇冠鋸齒
+            ctx.fillStyle = '#2B3A99';
+            ctx.beginPath();
+            ctx.moveTo(-r * 0.35, -r * 0.85);
+            ctx.lineTo(-r * 0.15, -r * 0.65);
+            ctx.lineTo(0, -r * 0.88);
+            ctx.lineTo(r * 0.15, -r * 0.65);
+            ctx.lineTo(r * 0.35, -r * 0.85);
+            ctx.closePath();
+            ctx.fill();
+        } else if (level === 1) {
+            // 草莓小籽籽與綠葉蒂頭
+            ctx.fillStyle = '#FFE66D';
+            const seeds = [[-0.45, -0.15], [0.45, -0.15], [-0.5, 0.3], [0.5, 0.3], [0, 0.62], [-0.28, 0.55], [0.28, 0.55]];
+            seeds.forEach(([sx, sy]) => {
+                ctx.beginPath();
+                ctx.ellipse(sx * r, sy * r, r * 0.045, r * 0.075, 0, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.fillStyle = '#2EC4B6';
+            ctx.beginPath();
+            ctx.arc(0, -r * 0.95, r * 0.42, 0, Math.PI);
+            ctx.fill();
+        } else if (level === 2) {
+            // 檸檬微點毛孔質感
+            ctx.fillStyle = 'rgba(255,255,255,0.35)';
+            [[-0.45, -0.35], [0.48, -0.3], [-0.55, 0.25], [0.52, 0.35]].forEach(([px, py]) => {
+                ctx.beginPath();
+                ctx.arc(px * r, py * r, r * 0.04, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        } else if (level === 3) {
+            // 橙子頂部小綠葉
+            ctx.fillStyle = '#38B000';
+            ctx.beginPath();
+            ctx.ellipse(r * 0.15, -r * 0.85, r * 0.24, r * 0.1, -0.4, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (level === 4) {
+            // 蘋果果梗與小葉子
+            ctx.strokeStyle = '#5C4033';
+            ctx.lineWidth = Math.max(2, r * 0.07);
+            ctx.beginPath();
+            ctx.moveTo(0, -r * 0.72);
+            ctx.quadraticCurveTo(r * 0.08, -r * 0.92, r * 0.15, -r * 0.98);
+            ctx.stroke();
+
+            ctx.fillStyle = '#52B788';
+            ctx.beginPath();
+            ctx.ellipse(-r * 0.18, -r * 0.82, r * 0.22, r * 0.1, 0.35, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (level === 5) {
+            // 水蜜桃可愛中間線條與粉嫩漸層
+            ctx.strokeStyle = 'rgba(217, 93, 130, 0.35)';
+            ctx.lineWidth = Math.max(2, r * 0.05);
+            ctx.beginPath();
+            ctx.moveTo(0, -r * 0.95);
+            ctx.quadraticCurveTo(r * 0.25, -r * 0.45, 0, -r * 0.15);
+            ctx.stroke();
+        } else if (level === 6) {
+            // 鳳梨菱格網紋與頂部葉冠
+            ctx.strokeStyle = 'rgba(181, 101, 29, 0.28)';
+            ctx.lineWidth = 2;
+            for (let i = -2; i <= 2; i++) {
+                ctx.beginPath();
+                ctx.moveTo(-r + i * r * 0.45, -r);
+                ctx.lineTo(r + i * r * 0.45, r);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(r + i * r * 0.45, -r);
+                ctx.lineTo(-r + i * r * 0.45, r);
+                ctx.stroke();
+            }
+            ctx.fillStyle = '#2D6A4F';
+            ctx.beginPath();
+            ctx.moveTo(-r * 0.35, -r * 0.75);
+            ctx.lineTo(-r * 0.15, -r * 0.98);
+            ctx.lineTo(0, -r * 0.78);
+            ctx.lineTo(r * 0.15, -r * 0.98);
+            ctx.lineTo(r * 0.35, -r * 0.75);
+            ctx.closePath();
+            ctx.fill();
+        } else if (level === 7) {
+            // 椰子奶白色內圈層次
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 0.82, 0, Math.PI * 2);
+            ctx.fillStyle = '#FFFDF9';
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 0.68, 0, Math.PI * 2);
+            ctx.fillStyle = '#E6CCB2';
+            ctx.fill();
+        } else if (level === 8) {
+            // 哈密瓜網紋線條
+            ctx.strokeStyle = 'rgba(244, 241, 222, 0.65)';
+            ctx.lineWidth = Math.max(2, r * 0.035);
+            for (let i = -2; i <= 2; i++) {
+                ctx.beginPath();
+                ctx.moveTo(-r, i * r * 0.38);
+                ctx.lineTo(r, i * r * 0.38);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(i * r * 0.38, -r);
+                ctx.lineTo(i * r * 0.38, r);
+                ctx.stroke();
+            }
+        } else if (level === 9) {
+            // 大西瓜經典深綠色波浪條紋
+            ctx.strokeStyle = '#1B4332';
+            ctx.lineWidth = Math.max(4, r * 0.075);
+            ctx.lineCap = 'round';
+            [-0.58, -0.2, 0.2, 0.58].forEach((offset) => {
+                ctx.beginPath();
+                ctx.moveTo(offset * r, -r * 0.95);
+                ctx.quadraticCurveTo((offset + (offset < 0 ? -0.18 : 0.18)) * r, 0, offset * r, r * 0.95);
+                ctx.stroke();
+            });
+        }
+        ctx.restore();
+
+        // 3. 外框描邊（卡通貼紙質感）
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, Math.PI * 2);
+        ctx.strokeStyle = f.border;
+        ctx.lineWidth = Math.max(2, r * 0.055);
+        ctx.stroke();
+
+        // 4. 左上角水潤高光反光點
+        ctx.save();
+        ctx.translate(-r * 0.36, -r * 0.36);
+        ctx.rotate(-0.6);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.62)';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, r * 0.19, r * 0.09, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // 5. 繪製超萌五官表情（大眼睛 + 腮紅 + 可愛嘴巴）
+        drawCuteFace(ctx, r, f.cheek, f.faceType);
+
+        ctx.restore();
+    }
+
+    function drawCuteFace(ctx, r, cheekColor, faceType) {
+        const eyeOffsetX = r * 0.28;
+        const eyeOffsetY = r * 0.04;
+        const eyeRadius = Math.max(2.3, r * 0.115);
+
+        // 腮紅
+        ctx.fillStyle = cheekColor;
+        ctx.globalAlpha = 0.65;
+        ctx.beginPath();
+        ctx.ellipse(-eyeOffsetX * 1.25, eyeOffsetY + r * 0.16, r * 0.13, r * 0.075, 0, 0, Math.PI * 2);
+        ctx.ellipse(eyeOffsetX * 1.25, eyeOffsetY + r * 0.16, r * 0.13, r * 0.075, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+        ctx.fillStyle = '#2B1B17';
+        ctx.strokeStyle = '#2B1B17';
+        ctx.lineWidth = Math.max(1.6, r * 0.045);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        // 繪製眼睛
+        if (faceType === 'bliss' || faceType === 'king') {
+            // 笑彎彎的月牙眼 ^ ^
+            [-1, 1].forEach(dir => {
+                ctx.beginPath();
+                ctx.arc(dir * eyeOffsetX, eyeOffsetY + eyeRadius * 0.3, eyeRadius * 0.95, Math.PI * 1.15, Math.PI * 1.85);
+                ctx.stroke();
+            });
+        } else if (faceType === 'sour') {
+            // 檸檬酸酸的 > < 眼
+            ctx.beginPath();
+            ctx.moveTo(-eyeOffsetX - eyeRadius * 0.7, eyeOffsetY - eyeRadius * 0.6);
+            ctx.lineTo(-eyeOffsetX + eyeRadius * 0.5, eyeOffsetY);
+            ctx.lineTo(-eyeOffsetX - eyeRadius * 0.7, eyeOffsetY + eyeRadius * 0.6);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(eyeOffsetX + eyeRadius * 0.7, eyeOffsetY - eyeRadius * 0.6);
+            ctx.lineTo(eyeOffsetX - eyeRadius * 0.5, eyeOffsetY);
+            ctx.lineTo(eyeOffsetX + eyeRadius * 0.7, eyeOffsetY + eyeRadius * 0.6);
+            ctx.stroke();
+        } else {
+            // 水汪汪大眼睛 + 白色眼神光
+            [-1, 1].forEach((dir, idx) => {
+                if (faceType === 'wink' && idx === 1) {
+                    // 眨眼表情
+                    ctx.beginPath();
+                    ctx.arc(dir * eyeOffsetX, eyeOffsetY + eyeRadius * 0.2, eyeRadius * 0.9, Math.PI * 1.15, Math.PI * 1.85);
+                    ctx.stroke();
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(dir * eyeOffsetX, eyeOffsetY, eyeRadius, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // 眼神高光
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.beginPath();
+                    ctx.arc(dir * eyeOffsetX - eyeRadius * 0.3, eyeOffsetY - eyeRadius * 0.3, eyeRadius * 0.38, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#2B1B17';
+                }
+            });
+        }
+
+        // 繪製嘴巴
+        const mouthY = eyeOffsetY + r * 0.16;
+        if (faceType === 'surprised') {
+            // 椰子驚訝小圓嘴 O
+            ctx.fillStyle = '#FF5D8F';
+            ctx.beginPath();
+            ctx.arc(0, mouthY + r * 0.04, r * 0.085, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+        } else if (faceType === 'king' || faceType === 'sparkle') {
+            // 開心張嘴大笑 D
+            ctx.fillStyle = '#FF5D8F';
+            ctx.beginPath();
+            ctx.arc(0, mouthY, r * 0.15, 0, Math.PI);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        } else if (faceType === 'sour') {
+            // 波形小嘴 ~
+            ctx.beginPath();
+            ctx.moveTo(-r * 0.1, mouthY + r * 0.03);
+            ctx.quadraticCurveTo(-r * 0.05, mouthY - r * 0.03, 0, mouthY + r * 0.03);
+            ctx.quadraticCurveTo(r * 0.05, mouthY + r * 0.09, r * 0.1, mouthY + r * 0.03);
+            ctx.stroke();
+        } else {
+            // 可愛貓咪微笑嘴 w / u
+            ctx.beginPath();
+            ctx.arc(0, mouthY, r * 0.11, 0.1 * Math.PI, 0.9 * Math.PI);
+            ctx.stroke();
+        }
+    }
+
+    /**
+     * ============================================================================
+     * 3. 2D 剛體圓形物理引擎與遊戲狀態管理 (完全自寫，無穿模、穩定不抖動)
+     * ============================================================================
+     */
+    class SuikaGame {
+        constructor() {
+            this.canvas = document.getElementById('gameCanvas');
+            this.ctx = this.canvas.getContext('2d');
+            this.nextCanvas = document.getElementById('nextCanvas');
+            this.nextCtx = this.nextCanvas.getContext('2d');
+
+            // 邏輯畫布基準尺寸（高解析度座標系，渲染時等比縮放適應任何螢幕）
+            this.width = 420;
+            this.height = 600;
+            this.dangerLineY = 115; // 警戒線高度
+            this.spawnY = 54;       // 投放水果懸浮高度
+
+            // 物理參數
+            this.gravity = 1650;    // 重力加速度 (px/s^2)
+            this.restitution = 0.22;// 彈性係數（低彈性避免水果亂飛）
+            this.friction = 0.985;  // 空氣與滾動阻尼
+            this.subSteps = 8;      // 子步進迭代次數（確保堆疊穩定不穿模）
+
+            // 遊戲狀態
+            this.fruits = [];
+            this.particles = [];
+            this.floatingTexts = [];
+            this.nextId = 1;
+
+            this.score = 0;
+            this.bestScore = parseInt(localStorage.getItem('suika_best_score') || '0', 10);
+            this.currentLevel = 0;
+            this.nextLevel = 0;
+            this.aimX = this.width / 2;
+            this.canDrop = true;
+            this.dropCooldown = 0;
+            this.isGameOver = false;
+
+            // 警戒線超時計算
+            this.dangerTimer = 0;
+            this.dangerLimit = 2.5; // 超過 2.5 秒判定 Game Over
+
+            // 連擊系統
+            this.comboCount = 0;
+            this.comboTimer = 0;
+
+            this.lastTime = performance.now();
+            this.initUI();
+            this.resizeCanvas();
+            window.addEventListener('resize', () => this.resizeCanvas());
+
+            this.resetGame();
+            requestAnimationFrame((t) => this.loop(t));
+        }
+
+        // 隨機產生可投放的小水果等級（前 5 級：藍莓、草莓、檸檬、橙子、蘋果）
+        getRandomDropLevel() {
+            const weights = [30, 28, 22, 13, 7];
+            const total = weights.reduce((a, b) => a + b, 0);
+            let rand = Math.random() * total;
+            for (let i = 0; i < weights.length; i++) {
+                if (rand < weights[i]) return i;
+                rand -= weights[i];
+            }
+            return 0;
+        }
+
+        resetGame() {
+            this.fruits = [];
+            this.particles = [];
+            this.floatingTexts = [];
+            this.score = 0;
+            this.isGameOver = false;
+            this.canDrop = true;
+            this.dropCooldown = 0;
+            this.dangerTimer = 0;
+            this.comboCount = 0;
+            this.comboTimer = 0;
+
+            this.currentLevel = this.getRandomDropLevel();
+            this.nextLevel = this.getRandomDropLevel();
+            this.aimX = this.width / 2;
+
+            this.updateScoreUI();
+            this.drawNextPreview();
+            document.getElementById('dangerBanner').classList.add('hidden');
+            document.getElementById('gameOverModal').classList.remove('active');
+        }
+
+        resizeCanvas() {
+            const container = document.getElementById('canvasContainer');
+            const rect = container.getBoundingClientRect();
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+            this.canvas.width = rect.width * dpr;
+            this.canvas.height = rect.height * dpr;
+
+            // 根據容器比例動態調整邏輯寬高，確保物理邊界完美貼合可視外框
+            const aspect = rect.width / rect.height;
+            this.height = 620;
+            this.width = Math.round(this.height * aspect);
+            this.dangerLineY = 112;
+            this.spawnY = 52;
+
+            const r = FRUITS[this.currentLevel]?.radius || 20;
+            this.aimX = Math.max(r + 6, Math.min(this.width - r - 6, this.aimX));
+        }
+
+        // 螢幕座標轉換為邏輯座標
+        clientToLogicalX(clientX) {
+            const rect = this.canvas.getBoundingClientRect();
+            const ratio = (clientX - rect.left) / rect.width;
+            return ratio * this.width;
+        }
+
+        setAimX(logicalX) {
+            if (this.isGameOver) return;
+            const r = FRUITS[this.currentLevel].radius;
+            const margin = r + 6;
+            this.aimX = Math.max(margin, Math.min(this.width - margin, logicalX));
+        }
+
+        dropFruit() {
+            if (this.isGameOver || !this.canDrop) return;
+
+            soundFX.playDrop();
+            const level = this.currentLevel;
+            const fData = FRUITS[level];
+
+            this.fruits.push({
+                id: this.nextId++,
+                level: level,
+                x: this.aimX,
+                y: this.spawnY,
+                vx: (Math.random() - 0.5) * 8, // 極微小初始擾動避免完全垂直死疊
+                vy: 60,
+                radius: fData.radius,
+                mass: fData.radius * fData.radius,
+                angle: (Math.random() - 0.5) * 0.4,
+                vAngle: 0,
+                scaleX: 1.15, // 投放瞬間微 Q 彈形變
+                scaleY: 0.85,
+                graceTime: 0.9, // 剛投放 0.9 秒內不計入警戒線超時
+                merged: false
+            });
+
+            this.canDrop = false;
+            this.dropCooldown = 0.42; // 投放冷卻時間，避免連點重疊卡死
+
+            this.currentLevel = this.nextLevel;
+            this.nextLevel = this.getRandomDropLevel();
+            this.setAimX(this.aimX); // 依新水果半徑重新限制邊界
+            this.drawNextPreview();
+        }
+
+        // 物理單步更新
+        stepPhysics(dt) {
+            if (this.isGameOver) return;
+
+            // 冷卻與連擊計時
+            if (!this.canDrop) {
+                this.dropCooldown -= dt;
+                if (this.dropCooldown <= 0) {
+                    this.canDrop = true;
+                }
+            }
+
+            if (this.comboTimer > 0) {
+                this.comboTimer -= dt;
+                if (this.comboTimer <= 0) {
+                    this.comboCount = 0;
+                }
+            }
+
+            const subDt = dt / this.subSteps;
+            const pendingMerges = [];
+
+            for (let step = 0; step < this.subSteps; step++) {
+                // 1. 更新位置與重力
+                for (let i = 0; i < this.fruits.length; i++) {
+                    const b = this.fruits[i];
+                    if (step === 0 && b.graceTime > 0) b.graceTime -= dt;
+
+                    // Q 彈果凍縮放回復
+                    if (step === 0) {
+                        b.scaleX += (1 - b.scaleX) * Math.min(1, dt * 14);
+                        b.scaleY += (1 - b.scaleY) * Math.min(1, dt * 14);
+                    }
+
+                    b.vy += this.gravity * subDt;
+                    b.vx *= Math.pow(this.friction, subDt * 60);
+                    b.vy *= Math.pow(this.friction, subDt * 60);
+
+                    b.x += b.vx * subDt;
+                    b.y += b.vy * subDt;
+
+                    // 滾動角速度模擬
+                    b.vAngle = b.vx / b.radius;
+                    b.angle += b.vAngle * subDt;
+
+                    // 2. 邊界碰撞（左右牆壁與底部木板）
+                    if (b.x - b.radius < 0) {
+                        b.x = b.radius;
+                        if (b.vx < 0) b.vx = -b.vx * this.restitution;
+                    } else if (b.x + b.radius > this.width) {
+                        b.x = this.width - b.radius;
+                        if (b.vx > 0) b.vx = -b.vx * this.restitution;
+                    }
+
+                    if (b.y + b.radius > this.height) {
+                        if (step === 0 && b.vy > 220) {
+                            soundFX.playBounce(b.vy / 800);
+                            b.scaleX = 1.14;
+                            b.scaleY = 0.86;
+                        }
+                        b.y = this.height - b.radius;
+                        if (b.vy > 0) b.vy = -b.vy * this.restitution;
+                        b.vx *= 0.92; // 底部摩擦阻力
+                    }
+                }
+
+                // 3. 水果之間圓形剛體碰撞與合成偵測
+                for (let i = 0; i < this.fruits.length; i++) {
+                    const a = this.fruits[i];
+                    if (a.merged) continue;
+
+                    for (let j = i + 1; j < this.fruits.length; j++) {
+                        const b = this.fruits[j];
+                        if (b.merged) continue;
+
+                        const dx = b.x - a.x;
+                        const dy = b.y - a.y;
+                        const distSq = dx * dx + dy * dy;
+                        const minDist = a.radius + b.radius;
+
+                        if (distSq < minDist * minDist) {
+                            const dist = Math.sqrt(distSq) || 0.001;
+
+                            // 相同等級水果碰撞 -> 觸發合成倍大！
+                            if (a.level === b.level && a.level < FRUITS.length - 1) {
+                                a.merged = true;
+                                b.merged = true;
+                                pendingMerges.push({
+                                    level: a.level + 1,
+                                    x: (a.x + b.x) * 0.5,
+                                    y: (a.y + b.y) * 0.5,
+                                    vx: (a.vx + b.vx) * 0.3,
+                                    vy: Math.min(a.vy, b.vy) * 0.3 - 40
+                                });
+                                break;
+                            }
+
+                            // 不同等級或已達最大西瓜 -> 剛體位置分離與動量交換
+                            const overlap = minDist - dist;
+                            const nx = dx / dist;
+                            const ny = dy / dist;
+
+                            const totalMass = a.mass + b.mass;
+                            const ratioA = b.mass / totalMass;
+                            const ratioB = a.mass / totalMass;
+
+                            // 位置修正（避免多顆重疊穿模）
+                            const correction = overlap * 0.82;
+                            a.x -= nx * correction * ratioA;
+                            a.y -= ny * correction * ratioA;
+                            b.x += nx * correction * ratioB;
+                            b.y += ny * correction * ratioB;
+
+                            // 相對速度與法向衝量
+                            const rvx = b.vx - a.vx;
+                            const rvy = b.vy - a.vy;
+                            const velAlongNormal = rvx * nx + rvy * ny;
+
+                            if (velAlongNormal < 0) {
+                                const impulse = -(1 + this.restitution) * velAlongNormal / (1 / a.mass + 1 / b.mass);
+                                const impulseX = impulse * nx;
+                                const impulseY = impulse * ny;
+
+                                a.vx -= impulseX / a.mass;
+                                a.vy -= impulseY / a.mass;
+                                b.vx += impulseX / b.mass;
+                                b.vy += impulseY / b.mass;
+
+                                // 切向摩擦促進自然滾動
+                                const tx = -ny;
+                                const ty = nx;
+                                const velAlongTangent = rvx * tx + rvy * ty;
+                                const frictionImpulse = -velAlongTangent * 0.08 / (1 / a.mass + 1 / b.mass);
+                                a.vx -= (frictionImpulse * tx) / a.mass;
+                                a.vy -= (frictionImpulse * ty) / a.mass;
+                                b.vx += (frictionImpulse * tx) / b.mass;
+                                b.vy += (frictionImpulse * ty) / b.mass;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 4. 處理本幀所有合成事件
+            if (pendingMerges.length > 0) {
+                this.fruits = this.fruits.filter(f => !f.merged);
+
+                pendingMerges.forEach(m => {
+                    this.comboCount++;
+                    this.comboTimer = 1.25;
+
+                    const newFruitData = FRUITS[m.level];
+                    // 確保合成後大水果不會超出左右邊界
+                    const clampedX = Math.max(newFruitData.radius + 2, Math.min(this.width - newFruitData.radius - 2, m.x));
+                    const clampedY = Math.min(this.height - newFruitData.radius - 2, m.y);
+
+                    this.fruits.push({
+                        id: this.nextId++,
+                        level: m.level,
+                        x: clampedX,
+                        y: clampedY,
+                        vx: m.vx,
+                        vy: m.vy,
+                        radius: newFruitData.radius,
+                        mass: newFruitData.radius * newFruitData.radius,
+                        angle: 0,
+                        vAngle: 0,
+                        scaleX: 0.45, // 從小彈大 Q 彈動畫
+                        scaleY: 0.45,
+                        graceTime: 0.6,
+                        merged: false
+                    });
+
+                    // 計算倍增分數（基礎分 + 連擊獎勵）
+                    const comboBonus = this.comboCount > 1 ? Math.round(newFruitData.score * 0.25 * (this.comboCount - 1)) : 0;
+                    const gained = newFruitData.score + comboBonus;
+                    this.addScore(gained);
+
+                    // 播放水滴音階音效與粒子特效
+                    soundFX.playMerge(m.level, this.comboCount);
+                    this.spawnMergeParticles(clampedX, clampedY, newFruitData.color, newFruitData.highlight, newFruitData.radius);
+
+                    const label = this.comboCount > 1
+                        ? `+${gained} (${this.comboCount}連擊!)`
+                        : `+${gained}`;
+                    this.spawnFloatingText(clampedX, clampedY - newFruitData.radius * 0.5, label, newFruitData.border);
+                });
+            }
+
+            // 5. 檢查警戒線是否超時
+            this.checkDangerLine(dt);
+        }
+
+        checkDangerLine(dt) {
+            let isOverLine = false;
+            for (const b of this.fruits) {
+                if (b.graceTime <= 0 && (b.y - b.radius) < this.dangerLineY) {
+                    isOverLine = true;
+                    break;
+                }
+            }
+
+            const banner = document.getElementById('dangerBanner');
+            const timerText = document.getElementById('dangerTimerText');
+
+            if (isOverLine) {
+                this.dangerTimer += dt;
+                const remain = Math.max(0, this.dangerLimit - this.dangerTimer);
+                banner.classList.remove('hidden');
+                timerText.textContent = remain.toFixed(1);
+
+                if (this.dangerTimer >= this.dangerLimit) {
+                    this.triggerGameOver();
+                }
+            } else {
+                this.dangerTimer = Math.max(0, this.dangerTimer - dt * 2);
+                if (this.dangerTimer <= 0.05) {
+                    this.dangerTimer = 0;
+                    banner.classList.add('hidden');
+                }
+            }
+        }
+
+        addScore(pts) {
+            this.score += pts;
+            if (this.score > this.bestScore) {
+                this.bestScore = this.score;
+                localStorage.setItem('suika_best_score', String(this.bestScore));
+            }
+            this.updateScoreUI();
+        }
+
+        updateScoreUI() {
+            document.getElementById('scoreDisplay').textContent = this.score.toLocaleString();
+            document.getElementById('bestScoreDisplay').textContent = this.bestScore.toLocaleString();
+        }
+
+        // 果汁與星星粒子爆發特效
+        spawnMergeParticles(x, y, color1, color2, radius) {
+            const count = Math.min(24, 10 + Math.floor(radius * 0.16));
+            for (let i = 0; i < count; i++) {
+                const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.3;
+                const speed = 90 + Math.random() * 190;
+                this.particles.push({
+                    x,
+                    y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed - 40,
+                    size: 4 + Math.random() * 5,
+                    color: i % 2 === 0 ? color1 : color2,
+                    life: 0.55 + Math.random() * 0.25,
+                    maxLife: 0.75,
+                    isStar: i % 3 === 0
+                });
+            }
+        }
+
+        spawnFloatingText(x, y, text, color) {
+            this.floatingTexts.push({
+                x,
+                y,
+                text,
+                color,
+                life: 0.9,
+                maxLife: 0.9
+            });
+        }
+
+        updateEffects(dt) {
+            for (let i = this.particles.length - 1; i >= 0; i--) {
+                const p = this.particles[i];
+                p.life -= dt;
+                if (p.life <= 0) {
+                    this.particles.splice(i, 1);
+                    continue;
+                }
+                p.vy += 380 * dt;
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+            }
+
+            for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
+                const ft = this.floatingTexts[i];
+                ft.life -= dt;
+                if (ft.life <= 0) {
+                    this.floatingTexts.splice(i, 1);
+                    continue;
+                }
+                ft.y -= 48 * dt;
+            }
+        }
+
+        drawNextPreview() {
+            const ctx = this.nextCtx;
+            ctx.clearRect(0, 0, 44, 44);
+            const r = Math.min(18, FRUITS[this.nextLevel].radius * 0.65);
+            drawCuteFruit(ctx, this.nextLevel, 22, 22, 0, 1, 1, r);
+        }
+
+        // 主畫面繪製
+        render() {
+            const ctx = this.ctx;
+            const scaleX = this.canvas.width / this.width;
+            const scaleY = this.canvas.height / this.height;
+
+            ctx.save();
+            ctx.scale(scaleX, scaleY);
+            ctx.clearRect(0, 0, this.width, this.height);
+
+            // 1. 繪製木箱內部微妙背景光暈與底部木紋地板
+            const floorGrad = ctx.createLinearGradient(0, this.height - 18, 0, this.height);
+            floorGrad.addColorStop(0, 'rgba(212, 163, 115, 0.25)');
+            floorGrad.addColorStop(1, 'rgba(188, 108, 37, 0.45)');
+            ctx.fillStyle = floorGrad;
+            ctx.fillRect(0, this.height - 18, this.width, 18);
+
+            // 2. 繪製紅色警戒虛線
+            ctx.save();
+            ctx.beginPath();
+            ctx.setLineDash([8, 6]);
+            ctx.moveTo(0, this.dangerLineY);
+            ctx.lineTo(this.width, this.dangerLineY);
+            ctx.strokeStyle = this.dangerTimer > 0 ? '#E63946' : 'rgba(230, 57, 70, 0.55)';
+            ctx.lineWidth = this.dangerTimer > 0 ? 3 : 2;
+            ctx.stroke();
+
+            // 警戒線右側小標籤
+            ctx.fillStyle = 'rgba(230, 57, 70, 0.7)';
+            ctx.font = '700 11px "Noto Sans TC", sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText('警戒線', this.width - 10, this.dangerLineY - 5);
+            ctx.restore();
+
+            // 3. 繪製投放瞄準輔助線與待投放水果
+            if (!this.isGameOver && this.canDrop) {
+                const curFruit = FRUITS[this.currentLevel];
+
+                // 垂直白色虛線瞄準線
+                ctx.save();
+                ctx.beginPath();
+                ctx.setLineDash([5, 5]);
+                ctx.moveTo(this.aimX, this.spawnY + curFruit.radius);
+                ctx.lineTo(this.aimX, this.height);
+                ctx.strokeStyle = 'rgba(164, 113, 72, 0.42)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.restore();
+
+                // 懸浮待掉落的水果
+                drawCuteFruit(ctx, this.currentLevel, this.aimX, this.spawnY, 0, 1, 1);
+            }
+
+            // 4. 繪製木箱內所有水果
+            for (const b of this.fruits) {
+                drawCuteFruit(ctx, b.level, b.x, b.y, b.angle, b.scaleX, b.scaleY);
+            }
+
+            // 5. 繪製果汁/星星粒子
+            for (const p of this.particles) {
+                const alpha = Math.max(0, p.life / p.maxLife);
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // 6. 繪製浮動得分文字
+            for (const ft of this.floatingTexts) {
+                const alpha = Math.min(1, (ft.life / ft.maxLife) * 1.4);
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.font = '900 17px "Fredoka", "Noto Sans TC", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 4;
+                ctx.strokeText(ft.text, ft.x, ft.y);
+                ctx.fillStyle = ft.color;
+                ctx.fillText(ft.text, ft.x, ft.y);
+                ctx.restore();
+            }
+
+            ctx.restore();
+        }
+
+        loop(now) {
+            const rawDt = (now - this.lastTime) / 1000;
+            this.lastTime = now;
+            const dt = Math.min(rawDt, 0.04); // 限制最大時間步長避免切換分頁後瞬移
+
+            this.stepPhysics(dt);
+            this.updateEffects(dt);
+            this.render();
+
+            requestAnimationFrame((t) => this.loop(t));
+        }
+
+        /**
+         * ========================================================================
+         * 4. 本地排行榜系統 (localStorage 離線儲存前 10 名)
+         * ========================================================================
+         */
+        getLeaderboard() {
+            try {
+                const data = JSON.parse(localStorage.getItem('suika_leaderboard_v1') || '[]');
+                return Array.isArray(data) ? data : [];
+            } catch {
+                return [];
+            }
+        }
+
+        saveToLeaderboard(name, score) {
+            const cleanName = (name || '').trim() || '西瓜達人';
+            localStorage.setItem('suika_last_nickname', cleanName);
+
+            const board = this.getLeaderboard();
+            const now = new Date();
+            const dateStr = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+            board.push({
+                name: cleanName,
+                score: score,
+                date: dateStr
+            });
+
+            board.sort((a, b) => b.score - a.score);
+            const top10 = board.slice(0, 10);
+            localStorage.setItem('suika_leaderboard_v1', JSON.stringify(top10));
+            return top10;
+        }
+
+        getExpectedRank(score) {
+            const board = this.getLeaderboard();
+            let rank = 1;
+            for (const item of board) {
+                if (score <= item.score) rank++;
+            }
+            return rank;
+        }
+
+        renderLeaderboardModal() {
+            const listEl = document.getElementById('leaderboardList');
+            const board = this.getLeaderboard();
+
+            if (board.length === 0) {
+                listEl.innerHTML = `
+                    <div class="text-center py-8 bg-amber-50/70 rounded-2xl border-2 border-dashed border-amber-200">
+                        <div class="text-3xl mb-1">🌱</div>
+                        <div class="text-sm font-bold text-amber-800">目前還沒有排行紀錄喔！</div>
+                        <div class="text-xs text-amber-700/70 mt-1">快來合成大西瓜搶下第一名吧～</div>
+                    </div>
+                `;
+                return;
+            }
+
+            const medals = ['🥇', '🥈', '🥉'];
+            listEl.innerHTML = board.map((item, idx) => {
+                const medal = medals[idx] || `<span class="text-xs font-black text-amber-800/70">#${idx + 1}</span>`;
+                const rowBg = idx === 0
+                    ? 'bg-gradient-to-r from-amber-100 to-yellow-50 border-amber-400'
+                    : 'bg-white border-amber-200';
+                return `
+                    <div class="flex items-center justify-between px-3 py-2 rounded-2xl border-2 ${rowBg}">
+                        <div class="flex items-center gap-2.5 min-w-0">
+                            <div class="w-7 text-center text-lg font-black shrink-0">${medal}</div>
+                            <div class="truncate">
+                                <div class="text-sm font-black text-amber-950 truncate">${this.escapeHTML(item.name)}</div>
+                                <div class="text-[11px] font-medium text-amber-700/75">${this.escapeHTML(item.date)}</div>
+                            </div>
+                        </div>
+                        <div class="text-base font-black text-rose-500 shrink-0 ml-2">
+                            ${Number(item.score).toLocaleString()} 分
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        escapeHTML(str) {
+            return String(str).replace(/[&<>"']/g, m => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[m]));
+        }
+
+        triggerGameOver() {
+            if (this.isGameOver) return;
+            this.isGameOver = true;
+            soundFX.playGameOver();
+
+            document.getElementById('dangerBanner').classList.add('hidden');
+            document.getElementById('finalScoreText').textContent = this.score.toLocaleString();
+
+            const newRecordBadge = document.getElementById('newRecordBadge');
+            if (this.score > 0 && this.score >= this.bestScore) {
+                newRecordBadge.classList.remove('hidden');
+            } else {
+                newRecordBadge.classList.add('hidden');
+            }
+
+            // 檢查是否進入前 10 名
+            const rank = this.getExpectedRank(this.score);
+            const saveSection = document.getElementById('saveScoreSection');
+            const saveConfirmMsg = document.getElementById('saveConfirmMsg');
+            const btnSave = document.getElementById('btnSaveScore');
+
+            saveConfirmMsg.classList.add('hidden');
+            btnSave.disabled = false;
+            btnSave.classList.remove('opacity-50');
+
+            if (this.score > 0 && rank <= 10) {
+                saveSection.classList.remove('hidden');
+                document.getElementById('rankPreviewText').textContent = `預計第 ${rank} 名`;
+                const savedNick = localStorage.getItem('suika_last_nickname') || '西瓜達人';
+                document.getElementById('playerNameInput').value = savedNick;
+            } else {
+                saveSection.classList.add('hidden');
+            }
+
+            document.getElementById('gameOverModal').classList.add('active');
+        }
+
+        /**
+         * ========================================================================
+         * 5. 事件綁定與底部進化條 / 圖鑑產生
+         * ========================================================================
+         */
+        initUI() {
+            // 滑鼠移動與點擊投放
+            this.canvas.addEventListener('pointermove', (e) => {
+                if (this.isGameOver) return;
+                this.setAimX(this.clientToLogicalX(e.clientX));
+            });
+
+            this.canvas.addEventListener('pointerdown', (e) => {
+                soundFX.init();
+                if (this.isGameOver) return;
+                this.setAimX(this.clientToLogicalX(e.clientX));
+            });
+
+            this.canvas.addEventListener('pointerup', (e) => {
+                if (this.isGameOver) return;
+                this.setAimX(this.clientToLogicalX(e.clientX));
+                this.dropFruit();
+            });
+
+            // 音效開關
+            document.getElementById('btnSound').addEventListener('click', () => {
+                const isOn = soundFX.toggle();
+                document.getElementById('soundIcon').textContent = isOn ? '🔊' : '🔇';
+                document.getElementById('soundLabel').textContent = isOn ? '音效開' : '靜音';
+            });
+
+            // 重新開始
+            document.getElementById('btnRestart').addEventListener('click', () => {
+                soundFX.init();
+                this.resetGame();
+            });
+
+            document.getElementById('btnPlayAgain').addEventListener('click', () => {
+                soundFX.init();
+                this.resetGame();
+            });
+
+            // 儲存成績至排行榜
+            document.getElementById('btnSaveScore').addEventListener('click', () => {
+                const input = document.getElementById('playerNameInput');
+                const btn = document.getElementById('btnSaveScore');
+                this.saveToLeaderboard(input.value, this.score);
+                btn.disabled = true;
+                btn.classList.add('opacity-50');
+                document.getElementById('saveConfirmMsg').classList.remove('hidden');
+            });
+
+            // 排行榜彈窗控制
+            const openBoard = () => {
+                this.renderLeaderboardModal();
+                document.getElementById('leaderboardModal').classList.add('active');
+            };
+            document.getElementById('btnLeaderboard').addEventListener('click', openBoard);
+            document.getElementById('btnOpenBoardFromOver').addEventListener('click', openBoard);
+            document.getElementById('btnCloseLeaderboard').addEventListener('click', () => {
+                document.getElementById('leaderboardModal').classList.remove('active');
+            });
+            document.getElementById('btnCloseLeaderboardBottom').addEventListener('click', () => {
+                document.getElementById('leaderboardModal').classList.remove('active');
+            });
+
+            // 清除排行榜確認框
+            document.getElementById('btnClearBoard').addEventListener('click', () => {
+                document.getElementById('confirmClearModal').classList.add('active');
+            });
+            document.getElementById('btnCancelClear').addEventListener('click', () => {
+                document.getElementById('confirmClearModal').classList.remove('active');
+            });
+            document.getElementById('btnConfirmClear').addEventListener('click', () => {
+                localStorage.removeItem('suika_leaderboard_v1');
+                document.getElementById('confirmClearModal').classList.remove('active');
+                this.renderLeaderboardModal();
+            });
+
+            // 圖鑑彈窗控制
+            const openGuide = () => document.getElementById('guideModal').classList.add('active');
+            document.getElementById('btnGuide').addEventListener('click', openGuide);
+            document.getElementById('evoBarContainer').addEventListener('click', openGuide);
+            document.getElementById('btnCloseGuide').addEventListener('click', () => {
+                document.getElementById('guideModal').classList.remove('active');
+            });
+            document.getElementById('btnCloseGuideBottom').addEventListener('click', () => {
+                document.getElementById('guideModal').classList.remove('active');
+            });
+
+            // 繪製底部進化條與圖鑑彈窗內的水果小畫布
+            this.buildEvolutionVisuals();
+        }
+
+        buildEvolutionVisuals() {
+            const evoBar = document.getElementById('evoBarContainer');
+            const guideGrid = document.getElementById('guideGrid');
+            evoBar.innerHTML = '';
+            guideGrid.innerHTML = '';
+
+            FRUITS.forEach((f, idx) => {
+                // 1. 底部進化條小圖示
+                const itemWrap = document.createElement('div');
+                itemWrap.className = 'flex items-center';
+
+                const c = document.createElement('canvas');
+                c.width = 32;
+                c.height = 32;
+                c.className = 'w-6 h-6 sm:w-7 sm:h-7';
+                const cCtx = c.getContext('2d');
+                drawCuteFruit(cCtx, idx, 16, 16, 0, 1, 1, 13);
+                itemWrap.appendChild(c);
+
+                if (idx < FRUITS.length - 1) {
+                    const arrow = document.createElement('span');
+                    arrow.className = 'text-[9px] text-amber-400 font-black mx-0.5';
+                    arrow.textContent = '›';
+                    itemWrap.appendChild(arrow);
+                }
+                evoBar.appendChild(itemWrap);
+
+                // 2. 圖鑑彈窗卡片
+                const card = document.createElement('div');
+                card.className = 'flex items-center gap-2.5 bg-amber-50/90 border-2 border-amber-200 rounded-2xl p-2';
+
+                const gc = document.createElement('canvas');
+                gc.width = 48;
+                gc.height = 48;
+                gc.className = 'w-11 h-11 shrink-0';
+                const gCtx = gc.getContext('2d');
+                drawCuteFruit(gCtx, idx, 24, 24, 0, 1, 1, 20);
+
+                const info = document.createElement('div');
+                info.innerHTML = `
+                    <div class="text-xs font-black text-amber-950">Lv.${idx + 1} ${f.name}</div>
+                    <div class="text-[11px] font-bold text-rose-500">合成 +${f.score} 分</div>
+                `;
+
+                card.appendChild(gc);
+                card.appendChild(info);
+                guideGrid.appendChild(card);
+            });
+        }
+    }
+
+    // 啟動遊戲
+    window.addEventListener('DOMContentLoaded', () => {
+        new SuikaGame();
+    });
+    </script>
+</body>
+</html>

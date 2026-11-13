@@ -1,0 +1,1401 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Block Blast 方塊爆破</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&family=Rubik:wght@600;800;900&display=swap" rel="stylesheet">
+    <style>
+        /* 自定義遊戲核心樣式與立體方塊質感 */
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        body {
+            font-family: 'Rubik', 'Noto Sans TC', sans-serif;
+            background: radial-gradient(circle at 50% 15%, #2b3a67 0%, #1a223f 55%, #11162b 100%);
+            color: #ffffff;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            touch-action: none;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* 8x8 棋盤容器 */
+        #board-container {
+            background: #141a31;
+            border: 3px solid #354478;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55), inset 0 2px 8px rgba(0, 0, 0, 0.6);
+            border-radius: 14px;
+            padding: 6px;
+            position: relative;
+        }
+
+        /* 網格底槽 */
+        .grid-cell {
+            background: #1e2749;
+            border-radius: 6px;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.45);
+            position: relative;
+            transition: background-color 0.1s ease;
+        }
+
+        /* 3D 寶石積木質感 */
+        .block-tile {
+            width: 100%;
+            height: 100%;
+            border-radius: 6px;
+            position: relative;
+            box-shadow:
+                inset 0 3px 3px rgba(255, 255, 255, 0.45),
+                inset 0 -3px 4px rgba(0, 0, 0, 0.35),
+                0 2px 4px rgba(0, 0, 0, 0.3);
+            transition: transform 0.12s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        /* 積木內部高光斜面 */
+        .block-tile::after {
+            content: '';
+            position: absolute;
+            top: 14%;
+            left: 14%;
+            right: 14%;
+            bottom: 14%;
+            border-radius: 3px;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0) 60%);
+            pointer-events: none;
+        }
+
+        /* 放置預覽 (Ghost Preview) */
+        .ghost-tile {
+            width: 100%;
+            height: 100%;
+            border-radius: 6px;
+            opacity: 0.45;
+            transform: scale(0.94);
+            pointer-events: none;
+        }
+
+        /* 即將消除行列的高亮特效 */
+        .will-clear {
+            animation: pulseGlow 0.45s infinite alternate ease-in-out;
+            z-index: 5;
+        }
+
+        @keyframes pulseGlow {
+            0% {
+                filter: brightness(1.15) drop-shadow(0 0 4px rgba(255, 255, 255, 0.6));
+                transform: scale(0.98);
+            }
+            100% {
+                filter: brightness(1.55) drop-shadow(0 0 12px rgba(255, 230, 100, 0.95));
+                transform: scale(1.03);
+            }
+        }
+
+        /* 消除爆破動畫 */
+        @keyframes clearPop {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+                filter: brightness(1.8);
+            }
+            50% {
+                transform: scale(1.22);
+                opacity: 0.85;
+            }
+            100% {
+                transform: scale(0);
+                opacity: 0;
+            }
+        }
+
+        .clearing-anim {
+            animation: clearPop 0.32s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+            z-index: 10;
+        }
+
+        /* 放置彈跳回饋 */
+        @keyframes placeBounce {
+            0% { transform: scale(1.15); }
+            60% { transform: scale(0.94); }
+            100% { transform: scale(1); }
+        }
+
+        .placed-anim {
+            animation: placeBounce 0.22s ease-out;
+        }
+
+        /* 無法放置時的變暗狀態 */
+        .piece-disabled {
+            opacity: 0.35;
+            filter: grayscale(0.65);
+            transition: opacity 0.25s ease, filter 0.25s ease;
+        }
+
+        /* 浮動文字動畫 (分數 / Combo / 讚美詞) */
+        @keyframes floatUpFade {
+            0% {
+                opacity: 0;
+                transform: translate(-50%, 10px) scale(0.6);
+            }
+            20% {
+                opacity: 1;
+                transform: translate(-50%, -10px) scale(1.15);
+            }
+            80% {
+                opacity: 1;
+                transform: translate(-50%, -45px) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(-50%, -65px) scale(0.9);
+            }
+        }
+
+        .floating-banner {
+            position: absolute;
+            pointer-events: none;
+            z-index: 40;
+            font-weight: 900;
+            text-align: center;
+            white-space: nowrap;
+            text-shadow: 0 4px 10px rgba(0, 0, 0, 0.75), 0 0 2px #000;
+            animation: floatUpFade 1.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        /* 螢幕震動特效 (多行消除 / Combo) */
+        @keyframes boardShake {
+            0%, 100% { transform: translate(0, 0); }
+            20% { transform: translate(-4px, 3px); }
+            40% { transform: translate(4px, -3px); }
+            60% { transform: translate(-3px, -2px); }
+            80% { transform: translate(3px, 2px); }
+        }
+
+        .shake-anim {
+            animation: boardShake 0.28s ease-in-out;
+        }
+
+        /* 粒子畫布 */
+        #particle-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 35;
+        }
+
+        /* 正在拖曳的浮動方塊層 */
+        #drag-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 50;
+            will-change: transform;
+        }
+
+        /* 待選槽區 */
+        .tray-slot {
+            flex: 1;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            touch-action: none;
+            cursor: grab;
+        }
+
+        .tray-slot:active {
+            cursor: grabbing;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 頂部資訊列：最高分、目前分數、連擊與音效開關 -->
+    <header class="w-full max-w-md px-4 pt-3 pb-1 flex items-center justify-between z-20">
+        <!-- 最高分 (皇冠) -->
+        <div class="flex items-center gap-2 bg-[#161e38]/90 border border-[#324275] px-3.5 py-1.5 rounded-2xl shadow-md">
+            <svg class="w-6 h-6 text-amber-400 drop-shadow" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1v-1h14v1z"/>
+            </svg>
+            <span id="best-score" class="text-lg sm:text-xl font-extrabold text-amber-300 tracking-wide">0</span>
+        </div>
+
+        <!-- 連擊指示器 -->
+        <div id="combo-badge" class="opacity-0 transition-all duration-300 transform scale-90 bg-gradient-to-r from-orange-500 to-pink-600 px-3 py-1 rounded-full shadow-lg border border-white/30">
+            <span id="combo-text" class="text-xs sm:text-sm font-black tracking-wider text-white">COMBO x1</span>
+        </div>
+
+        <!-- 右側按鈕群：重新開始 & 靜音開關 -->
+        <div class="flex items-center gap-2">
+            <button id="restart-header-btn" title="重新開始" class="p-2.5 bg-[#161e38]/90 hover:bg-[#222e54] active:scale-95 border border-[#324275] rounded-xl text-slate-200 transition shadow-md">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+            </button>
+            <button id="sound-toggle-btn" title="音效開關" class="p-2.5 bg-[#161e38]/90 hover:bg-[#222e54] active:scale-95 border border-[#324275] rounded-xl text-slate-200 transition shadow-md">
+                <!-- 開啟音效圖示 -->
+                <svg id="icon-sound-on" class="w-5 h-5 text-sky-400" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                </svg>
+                <!-- 靜音圖示 -->
+                <svg id="icon-sound-off" class="w-5 h-5 text-rose-400 hidden" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- 中央大字當前分數 -->
+    <div class="flex flex-col items-center justify-center my-1 z-10">
+        <div id="current-score" class="text-4xl sm:text-5xl font-black text-white tracking-tight drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]">
+            0
+        </div>
+    </div>
+
+    <!-- 8x8 主遊戲棋盤 -->
+    <main class="flex-1 flex items-center justify-center w-full px-3">
+        <div id="board-container">
+            <div id="grid-board" class="grid grid-cols-8 gap-1 sm:gap-1.5">
+                <!-- 64 個格子將由 JS 動態生成 -->
+            </div>
+        </div>
+    </main>
+
+    <!-- 下方 3 個待選方塊托盤區 -->
+    <section id="tray-container" class="w-full max-w-md h-32 sm:h-36 px-3 pb-4 pt-1 flex items-center justify-between gap-2 z-20 select-none" style="touch-action: none;">
+        <div id="slot-0" data-slot="0" class="tray-slot rounded-2xl"></div>
+        <div id="slot-1" data-slot="1" class="tray-slot rounded-2xl"></div>
+        <div id="slot-2" data-slot="2" class="tray-slot rounded-2xl"></div>
+    </section>
+
+    <!-- 拖曳時的浮動方塊容器 -->
+    <div id="drag-layer" class="hidden"></div>
+
+    <!-- 爆破粒子特效畫布 -->
+    <canvas id="particle-canvas"></canvas>
+
+    <!-- Game Over 結算彈窗 -->
+    <div id="gameover-modal" class="fixed inset-0 bg-[#0b0f21]/85 backdrop-blur-md hidden items-center justify-center z-50 px-4">
+        <div class="bg-gradient-to-b from-[#232f59] to-[#161e3b] border-2 border-[#425699] rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center shadow-2xl transform transition-all scale-100">
+            <div class="inline-block px-4 py-1 rounded-full bg-rose-500/20 border border-rose-400/40 text-rose-300 text-xs font-bold tracking-widest uppercase mb-2">
+                無處可放
+            </div>
+            <h2 class="text-3xl sm:text-4xl font-black text-white mb-6 tracking-wide">遊戲結束</h2>
+
+            <div class="bg-[#121830]/80 rounded-2xl p-4 mb-6 border border-[#2c3b6e] space-y-3">
+                <div>
+                    <div class="text-xs text-slate-400 font-bold uppercase tracking-wider">本局得分</div>
+                    <div id="final-score" class="text-4xl font-black text-sky-400 mt-0.5">0</div>
+                </div>
+                <div class="h-px bg-[#2c3b6e] w-full"></div>
+                <div class="flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5 text-amber-400" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1v-1h14v1z"/>
+                    </svg>
+                    <span class="text-sm text-slate-300 font-bold">最高紀錄：</span>
+                    <span id="final-best" class="text-lg font-black text-amber-300">0</span>
+                </div>
+            </div>
+
+            <button id="play-again-btn" class="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-300 hover:to-teal-400 active:scale-95 text-slate-950 font-black text-lg shadow-[0_6px_20px_rgba(16,185,129,0.45)] transition cursor-pointer">
+                再玩一局
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * ============================================================================
+         * 1. 音效合成器 (Web Audio API - 無需外部音檔)
+         * ============================================================================
+         */
+        class SoundManager {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+            }
+
+            init() {
+                try {
+                    if (!this.ctx) {
+                        const AudioContext = window.AudioContext || window.webkitAudioContext;
+                        if (AudioContext) {
+                            this.ctx = new AudioContext();
+                        }
+                    }
+                    if (this.ctx && this.ctx.state === 'suspended') {
+                        // 非同步解鎖音效，絕不阻塞拖曳事件流程
+                        this.ctx.resume().catch(() => {});
+                    }
+                } catch (e) {
+                    // 忽略部分瀏覽器限制
+                }
+            }
+
+            toggleMute() {
+                this.muted = !this.muted;
+                return this.muted;
+            }
+
+            // 拿起方塊的輕快短音
+            playPickup() {
+                if (this.muted) return;
+                this.init();
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(320, now);
+                osc.frequency.exponentialRampToValueAtTime(520, now + 0.08);
+                gain.gain.setValueAtTime(0.18, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.09);
+            }
+
+            // 放置方塊的沉穩清脆聲
+            playPlace() {
+                if (this.muted) return;
+                this.init();
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(240, now);
+                osc.frequency.exponentialRampToValueAtTime(110, now + 0.11);
+                gain.gain.setValueAtTime(0.28, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.12);
+            }
+
+            // 放回原位的滑音
+            playReturn() {
+                if (this.muted) return;
+                this.init();
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(280, now);
+                osc.frequency.exponentialRampToValueAtTime(160, now + 0.1);
+                gain.gain.setValueAtTime(0.12, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            }
+
+            // 消除爆破與連擊升調音效
+            playClear(linesCount, combo) {
+                if (this.muted) return;
+                this.init();
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                // 基礎音階隨連擊數往上提高
+                const baseFreqs = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+                const pitchMultiplier = Math.min(1 + (combo - 1) * 0.12, 1.8);
+
+                const notes = Math.min(linesCount + 1, 4);
+                for (let i = 0; i < notes; i++) {
+                    const startTime = now + i * 0.055;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = i % 2 === 0 ? 'triangle' : 'sine';
+                    osc.frequency.setValueAtTime(baseFreqs[i] * pitchMultiplier, startTime);
+                    osc.frequency.exponentialRampToValueAtTime(baseFreqs[i] * pitchMultiplier * 1.15, startTime + 0.22);
+
+                    gain.gain.setValueAtTime(0.24, startTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.25);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(startTime);
+                    osc.stop(startTime + 0.26);
+                }
+            }
+
+            // 遊戲結束音效
+            playGameOver() {
+                if (this.muted) return;
+                this.init();
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const notes = [392.00, 349.23, 311.13, 261.63]; // G4, F4, Eb4, C4
+                notes.forEach((freq, idx) => {
+                    const start = now + idx * 0.16;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(freq, start);
+                    gain.gain.setValueAtTime(0.14, start);
+                    gain.gain.exponentialRampToValueAtTime(0.001, start + 0.25);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(start);
+                    osc.stop(start + 0.26);
+                });
+            }
+        }
+
+        const sound = new SoundManager();
+
+        /**
+         * ============================================================================
+         * 2. 積木色彩庫與經典 Block Blast 方塊形狀定義
+         * ============================================================================
+         */
+        const BLOCK_COLORS = [
+            { name: 'cyan',   bg: 'linear-gradient(135deg, #22d3ee 0%, #0284c7 100%)', hex: '#22d3ee' },
+            { name: 'amber',  bg: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)', hex: '#fbbf24' },
+            { name: 'rose',   bg: 'linear-gradient(135deg, #fb7185 0%, #e11d48 100%)', hex: '#fb7185' },
+            { name: 'emerald',bg: 'linear-gradient(135deg, #34d399 0%, #059669 100%)', hex: '#34d399' },
+            { name: 'violet', bg: 'linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%)', hex: '#a78bfa' },
+            { name: 'orange', bg: 'linear-gradient(135deg, #fb923c 0%, #ea580c 100%)', hex: '#fb923c' },
+            { name: 'blue',   bg: 'linear-gradient(135deg, #60a5fa 0%, #2563eb 100%)', hex: '#60a5fa' }
+        ];
+
+        // 經典 Block Blast 積木矩陣 (1 表示有方塊，0 表示空)
+        const SHAPES = [
+            // 單格
+            { matrix: [[1]], weight: 4 },
+            // 直線與橫線 (1x2, 2x1, 1x3, 3x1, 1x4, 4x1, 1x5, 5x1)
+            { matrix: [[1, 1]], weight: 7 },
+            { matrix: [[1], [1]], weight: 7 },
+            { matrix: [[1, 1, 1]], weight: 8 },
+            { matrix: [[1], [1], [1]], weight: 8 },
+            { matrix: [[1, 1, 1, 1]], weight: 6 },
+            { matrix: [[1], [1], [1], [1]], weight: 6 },
+            { matrix: [[1, 1, 1, 1, 1]], weight: 4 },
+            { matrix: [[1], [1], [1], [1], [1]], weight: 4 },
+            // 正方形 (2x2, 3x3)
+            { matrix: [[1, 1], [1, 1]], weight: 9 },
+            { matrix: [[1, 1, 1], [1, 1, 1], [1, 1, 1]], weight: 4 },
+            // 2x3 與 3x2 矩形
+            { matrix: [[1, 1, 1], [1, 1, 1]], weight: 4 },
+            { matrix: [[1, 1], [1, 1], [1, 1]], weight: 4 },
+            // 小 L 型 (2x2 缺一角)
+            { matrix: [[1, 0], [1, 1]], weight: 7 },
+            { matrix: [[0, 1], [1, 1]], weight: 7 },
+            { matrix: [[1, 1], [1, 0]], weight: 7 },
+            { matrix: [[1, 1], [0, 1]], weight: 7 },
+            // 標準 L 型與反 L 型
+            { matrix: [[1, 0], [1, 0], [1, 1]], weight: 6 },
+            { matrix: [[0, 1], [0, 1], [1, 1]], weight: 6 },
+            { matrix: [[1, 1], [1, 0], [1, 0]], weight: 6 },
+            { matrix: [[1, 1], [0, 1], [0, 1]], weight: 6 },
+            { matrix: [[1, 1, 1], [1, 0, 0]], weight: 6 },
+            { matrix: [[1, 1, 1], [0, 0, 1]], weight: 6 },
+            { matrix: [[1, 0, 0], [1, 1, 1]], weight: 6 },
+            { matrix: [[0, 0, 1], [1, 1, 1]], weight: 6 },
+            // 大角 L 型 (3x3 邊角)
+            { matrix: [[1, 0, 0], [1, 0, 0], [1, 1, 1]], weight: 4 },
+            { matrix: [[0, 0, 1], [0, 0, 1], [1, 1, 1]], weight: 4 },
+            { matrix: [[1, 1, 1], [1, 0, 0], [1, 0, 0]], weight: 4 },
+            { matrix: [[1, 1, 1], [0, 0, 1], [0, 0, 1]], weight: 4 },
+            // T 型四方向
+            { matrix: [[1, 1, 1], [0, 1, 0]], weight: 6 },
+            { matrix: [[0, 1, 0], [1, 1, 1]], weight: 6 },
+            { matrix: [[1, 0], [1, 1], [1, 0]], weight: 6 },
+            { matrix: [[0, 1], [1, 1], [0, 1]], weight: 6 },
+            // Z 型與 S 型
+            { matrix: [[1, 1, 0], [0, 1, 1]], weight: 5 },
+            { matrix: [[0, 1, 1], [1, 1, 0]], weight: 5 },
+            { matrix: [[0, 1], [1, 1], [1, 0]], weight: 5 },
+            { matrix: [[1, 0], [1, 1], [0, 1]], weight: 5 }
+        ];
+
+        /**
+         * ============================================================================
+         * 3. 粒子特效系統 (方塊爆破碎片)
+         * ============================================================================
+         */
+        class ParticleSystem {
+            constructor(canvas) {
+                this.canvas = canvas;
+                this.ctx = canvas.getContext('2d');
+                this.particles = [];
+                this.resize();
+                window.addEventListener('resize', () => this.resize());
+                this.loop();
+            }
+
+            resize() {
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+            }
+
+            spawnExplosion(x, y, colorHex, count = 10) {
+                for (let i = 0; i < count; i++) {
+                    const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.5;
+                    const speed = 2.5 + Math.random() * 5.5;
+                    this.particles.push({
+                        x,
+                        y,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed - 1.5,
+                        size: 5 + Math.random() * 6,
+                        color: colorHex,
+                        alpha: 1,
+                        gravity: 0.25,
+                        rotation: Math.random() * Math.PI * 2,
+                        vRot: (Math.random() - 0.5) * 0.2
+                    });
+                }
+            }
+
+            loop() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    const p = this.particles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += p.gravity;
+                    p.alpha -= 0.025;
+                    p.rotation += p.vRot;
+
+                    if (p.alpha <= 0) {
+                        this.particles.splice(i, 1);
+                        continue;
+                    }
+
+                    this.ctx.save();
+                    this.ctx.globalAlpha = p.alpha;
+                    this.ctx.translate(p.x, p.y);
+                    this.ctx.rotate(p.rotation);
+                    this.ctx.fillStyle = p.color;
+                    this.ctx.beginPath();
+                    this.ctx.roundRect(-p.size / 2, -p.size / 2, p.size, p.size, 2);
+                    this.ctx.fill();
+                    this.ctx.restore();
+                }
+                requestAnimationFrame(() => this.loop());
+            }
+        }
+
+        /**
+         * ============================================================================
+         * 4. 遊戲核心狀態與邏輯控制
+         * ============================================================================
+         */
+        const BOARD_SIZE = 8;
+        const STORAGE_KEY = 'block_blast_best_score_v1';
+
+        const state = {
+            grid: Array.from({ length: BOARD_SIZE }, () => Array(BOARD_SIZE).fill(null)),
+            tray: [null, null, null],
+            score: 0,
+            displayScore: 0,
+            bestScore: parseInt(localStorage.getItem(STORAGE_KEY) || '0', 10),
+            combo: 0,
+            // 追蹤當前這一輪 3 個方塊中是否至少消除過一次（Block Blast 原版連擊規則）
+            clearedInCurrentBatch: false,
+            // 拖曳狀態
+            dragging: {
+                active: false,
+                pointerId: null,
+                slotIndex: -1,
+                piece: null,
+                pointerX: 0,
+                pointerY: 0,
+                touchOffsetY: 0,
+                hoverRow: -1,
+                hoverCol: -1,
+                isValidHover: false
+            },
+            cellSize: 40,
+            cellGap: 4,
+            isGameOver: false
+        };
+
+        // DOM 元素參照
+        const boardContainer = document.getElementById('board-container');
+        const gridBoardEl = document.getElementById('grid-board');
+        const trayContainerEl = document.getElementById('tray-container');
+        const currentScoreEl = document.getElementById('current-score');
+        const bestScoreEl = document.getElementById('best-score');
+        const comboBadgeEl = document.getElementById('combo-badge');
+        const comboTextEl = document.getElementById('combo-text');
+        const dragLayerEl = document.getElementById('drag-layer');
+        const gameOverModal = document.getElementById('gameover-modal');
+        const finalScoreEl = document.getElementById('final-score');
+        const finalBestEl = document.getElementById('final-best');
+
+        const particles = new ParticleSystem(document.getElementById('particle-canvas'));
+        const cellElements = [];
+
+        /**
+         * 初始化 8x8 棋盤 DOM 與 RWD 尺寸自適應
+         */
+        function initBoardDOM() {
+            gridBoardEl.innerHTML = '';
+            cellElements.length = 0;
+
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                const rowEls = [];
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'grid-cell';
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+                    gridBoardEl.appendChild(cell);
+                    rowEls.push(cell);
+                }
+                cellElements.push(rowEls);
+            }
+            updateLayoutMetrics();
+        }
+
+        function updateLayoutMetrics() {
+            // 根據螢幕寬高計算最適合的單格大小，確保手機與桌機都不會超出可視範圍
+            const maxBoardWidth = Math.min(window.innerWidth - 28, 430);
+            const availableHeight = window.innerHeight - 235; // 扣除頂部計分板與底部托盤
+            const boardPixel = Math.max(240, Math.min(maxBoardWidth, availableHeight));
+
+            const isMobile = window.innerWidth < 640;
+            state.cellGap = isMobile ? 4 : 6;
+            const padding = 12; // boardContainer 左右內距總和
+            state.cellSize = Math.floor((boardPixel - padding - state.cellGap * (BOARD_SIZE - 1)) / BOARD_SIZE);
+
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    cellElements[r][c].style.width = `${state.cellSize}px`;
+                    cellElements[r][c].style.height = `${state.cellSize}px`;
+                }
+            }
+            renderTray();
+        }
+
+        /**
+         * 權重隨機抽取一個方塊形狀與顏色
+         */
+        function generateRandomPiece() {
+            const totalWeight = SHAPES.reduce((sum, s) => sum + s.weight, 0);
+            let rand = Math.random() * totalWeight;
+            let chosenShape = SHAPES[0].matrix;
+
+            for (const item of SHAPES) {
+                if (rand < item.weight) {
+                    chosenShape = item.matrix;
+                    break;
+                }
+                rand -= item.weight;
+            }
+
+            const color = BLOCK_COLORS[Math.floor(Math.random() * BLOCK_COLORS.length)];
+            return {
+                matrix: chosenShape.map(row => [...row]),
+                color,
+                rows: chosenShape.length,
+                cols: chosenShape[0].length
+            };
+        }
+
+        /**
+         * 生成新一組 3 個待選方塊（確保至少有一個在當前棋盤放得下，提升遊玩體驗）
+         */
+        function refillTray() {
+            for (let i = 0; i < 3; i++) {
+                state.tray[i] = generateRandomPiece();
+            }
+            // 若 3 個都完全放不下，嘗試替換其中一個為較好放置的小方塊，避免剛發牌就死局
+            if (!canAnyTrayPieceFit()) {
+                const fallbackShapes = [
+                    [[1]],
+                    [[1, 1]],
+                    [[1], [1]],
+                    [[1, 1], [1, 1]],
+                    [[1, 0], [1, 1]]
+                ];
+                const matrix = fallbackShapes[Math.floor(Math.random() * fallbackShapes.length)];
+                const color = BLOCK_COLORS[Math.floor(Math.random() * BLOCK_COLORS.length)];
+                state.tray[1] = {
+                    matrix,
+                    color,
+                    rows: matrix.length,
+                    cols: matrix[0].length
+                };
+            }
+            state.clearedInCurrentBatch = false;
+            renderTray();
+            checkGameOver();
+        }
+
+        /**
+         * 檢查指定方塊能否放在 (startRow, startCol)
+         */
+        function canPlacePieceAt(piece, startRow, startCol) {
+            if (!piece) return false;
+            if (startRow < 0 || startCol < 0) return false;
+            if (startRow + piece.rows > BOARD_SIZE || startCol + piece.cols > BOARD_SIZE) return false;
+
+            for (let r = 0; r < piece.rows; r++) {
+                for (let c = 0; c < piece.cols; c++) {
+                    if (piece.matrix[r][c] === 1) {
+                        if (state.grid[startRow + r][startCol + c] !== null) {
+                            return false;
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+
+        /**
+         * 檢查某個方塊在整個 8x8 棋盤上是否至少有一個合法位置
+         */
+        function canPieceFitAnywhere(piece) {
+            if (!piece) return false;
+            for (let r = 0; r <= BOARD_SIZE - piece.rows; r++) {
+                for (let c = 0; c <= BOARD_SIZE - piece.cols; c++) {
+                    if (canPlacePieceAt(piece, r, c)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function canAnyTrayPieceFit() {
+            return state.tray.some(piece => piece !== null && canPieceFitAnywhere(piece));
+        }
+
+        /**
+         * 渲染下方 3 個待選托盤，並標記無法放置的方塊為變暗
+         */
+        function renderTray() {
+            const previewTileSize = Math.min(Math.floor(state.cellSize * 0.56), 24);
+            const previewGap = 2;
+
+            for (let i = 0; i < 3; i++) {
+                const slotEl = document.getElementById(`slot-${i}`);
+                slotEl.innerHTML = '';
+                const piece = state.tray[i];
+
+                if (!piece) {
+                    slotEl.style.cursor = 'default';
+                    continue;
+                }
+                slotEl.style.cursor = 'grab';
+
+                // 若正在拖曳此格方塊，托盤內先隱藏
+                if (state.dragging.active && state.dragging.slotIndex === i) continue;
+
+                const canFit = canPieceFitAnywhere(piece);
+                const wrapper = document.createElement('div');
+                wrapper.className = `p-2 pointer-events-none transition-transform duration-150 ${canFit ? '' : 'piece-disabled'}`;
+                wrapper.style.display = 'grid';
+                wrapper.style.gridTemplateColumns = `repeat(${piece.cols}, ${previewTileSize}px)`;
+                wrapper.style.gap = `${previewGap}px`;
+
+                for (let r = 0; r < piece.rows; r++) {
+                    for (let c = 0; c < piece.cols; c++) {
+                        const cell = document.createElement('div');
+                        cell.style.width = `${previewTileSize}px`;
+                        cell.style.height = `${previewTileSize}px`;
+                        if (piece.matrix[r][c] === 1) {
+                            const tile = document.createElement('div');
+                            tile.className = 'block-tile';
+                            tile.style.background = piece.color.bg;
+                            tile.style.borderRadius = '4px';
+                            cell.appendChild(tile);
+                        }
+                        wrapper.appendChild(cell);
+                    }
+                }
+
+                slotEl.appendChild(wrapper);
+            }
+        }
+
+        /**
+         * 渲染整個 8x8 棋盤（含已放置方塊、Ghost 預覽、以及即將消除行列高亮）
+         */
+        function renderBoard(placedCoords = []) {
+            const placedSet = new Set(placedCoords.map(([r, c]) => `${r},${c}`));
+
+            // 計算若放在目前懸停位置，會觸發哪些整行/整列消除
+            let previewRowsToClear = new Set();
+            let previewColsToClear = new Set();
+            const ghostCells = new Map();
+
+            if (state.dragging.active && state.dragging.isValidHover) {
+                const { piece, hoverRow, hoverCol } = state.dragging;
+                for (let r = 0; r < piece.rows; r++) {
+                    for (let c = 0; c < piece.cols; c++) {
+                        if (piece.matrix[r][c] === 1) {
+                            ghostCells.set(`${hoverRow + r},${hoverCol + c}`, piece.color);
+                        }
+                    }
+                }
+
+                // 模擬檢查行
+                for (let r = 0; r < BOARD_SIZE; r++) {
+                    let full = true;
+                    for (let c = 0; c < BOARD_SIZE; c++) {
+                        if (state.grid[r][c] === null && !ghostCells.has(`${r},${c}`)) {
+                            full = false;
+                            break;
+                        }
+                    }
+                    if (full) previewRowsToClear.add(r);
+                }
+
+                // 模擬檢查列
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    let full = true;
+                    for (let r = 0; r < BOARD_SIZE; r++) {
+                        if (state.grid[r][c] === null && !ghostCells.has(`${r},${c}`)) {
+                            full = false;
+                            break;
+                        }
+                    }
+                    if (full) previewColsToClear.add(c);
+                }
+            }
+
+            // 更新每一個 DOM 格子
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    const cellEl = cellElements[r][c];
+                    const key = `${r},${c}`;
+                    const existingColor = state.grid[r][c];
+                    const ghostColor = ghostCells.get(key);
+                    const isWillClear = previewRowsToClear.has(r) || previewColsToClear.has(c);
+
+                    cellEl.innerHTML = '';
+                    cellEl.classList.remove('will-clear');
+
+                    if (existingColor) {
+                        const tile = document.createElement('div');
+                        tile.className = 'block-tile';
+                        if (placedSet.has(key)) {
+                            tile.classList.add('placed-anim');
+                        }
+                        // 如果該格因為預覽放置而即將被消除，切換成預覽方塊顏色並加上發光特效
+                        if (isWillClear && state.dragging.isValidHover) {
+                            tile.style.background = state.dragging.piece.color.bg;
+                            cellEl.classList.add('will-clear');
+                        } else {
+                            tile.style.background = existingColor.bg;
+                        }
+                        cellEl.appendChild(tile);
+                    } else if (ghostColor) {
+                        const ghost = document.createElement('div');
+                        ghost.className = 'block-tile ghost-tile';
+                        ghost.style.background = ghostColor.bg;
+                        if (isWillClear) {
+                            ghost.style.opacity = '0.85';
+                            cellEl.classList.add('will-clear');
+                        }
+                        cellEl.appendChild(ghost);
+                    }
+                }
+            }
+        }
+
+        /**
+         * ============================================================================
+         * 5. 統一 Pointer Events 即時一觸即拖系統 (第一下按下立即抓取，無二次點擊)
+         * ============================================================================
+         */
+        function findClosestAvailableSlot(clientX, clientY) {
+            // 優先檢查指標是否直接落在某個有方塊的 slot 區域內
+            for (let i = 0; i < 3; i++) {
+                if (!state.tray[i]) continue;
+                const slotEl = document.getElementById(`slot-${i}`);
+                const rect = slotEl.getBoundingClientRect();
+                if (
+                    clientX >= rect.left &&
+                    clientX <= rect.right &&
+                    clientY >= rect.top &&
+                    clientY <= rect.bottom
+                ) {
+                    return i;
+                }
+            }
+
+            // 若點在槽位之間的縫隙或邊緣 padding，自動吸附到距離最近且有方塊的槽位
+            let closestIdx = -1;
+            let minDist = Infinity;
+            for (let i = 0; i < 3; i++) {
+                if (!state.tray[i]) continue;
+                const slotEl = document.getElementById(`slot-${i}`);
+                const rect = slotEl.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                const dist = Math.hypot(clientX - centerX, clientY - centerY);
+                if (dist < minDist && dist < rect.width * 0.9) {
+                    minDist = dist;
+                    closestIdx = i;
+                }
+            }
+            return closestIdx;
+        }
+
+        function startDragging(slotIndex, e) {
+            const piece = state.tray[slotIndex];
+            if (!piece) return;
+
+            const isTouchLike = e.pointerType === 'touch' || e.pointerType === 'pen';
+
+            state.dragging.active = true;
+            state.dragging.pointerId = e.pointerId;
+            state.dragging.slotIndex = slotIndex;
+            state.dragging.piece = piece;
+            state.dragging.pointerX = e.clientX;
+            state.dragging.pointerY = e.clientY;
+            // 觸控時向上偏移避免手指遮擋方塊與棋盤預覽；滑鼠精準跟隨游標
+            state.dragging.touchOffsetY = isTouchLike ? 82 : 12;
+            state.dragging.hoverRow = -1;
+            state.dragging.hoverCol = -1;
+            state.dragging.isValidHover = false;
+
+            // 立即建立浮動拖曳層並更新位置（確保第一幀就跟隨手指/游標）
+            buildDragLayer(piece);
+            updateDragPosition();
+            renderTray();
+
+            // 非同步播放抓取音效，避免任何音訊初始化延遲拖曳
+            sound.playPickup();
+        }
+
+        function buildDragLayer(piece) {
+            dragLayerEl.innerHTML = '';
+            dragLayerEl.style.display = 'grid';
+            dragLayerEl.style.gridTemplateColumns = `repeat(${piece.cols}, ${state.cellSize}px)`;
+            dragLayerEl.style.gap = `${state.cellGap}px`;
+
+            for (let r = 0; r < piece.rows; r++) {
+                for (let c = 0; c < piece.cols; c++) {
+                    const cell = document.createElement('div');
+                    cell.style.width = `${state.cellSize}px`;
+                    cell.style.height = `${state.cellSize}px`;
+                    if (piece.matrix[r][c] === 1) {
+                        const tile = document.createElement('div');
+                        tile.className = 'block-tile';
+                        tile.style.background = piece.color.bg;
+                        tile.style.boxShadow = '0 10px 22px rgba(0,0,0,0.5), inset 0 3px 3px rgba(255,255,255,0.5)';
+                        cell.appendChild(tile);
+                    }
+                    dragLayerEl.appendChild(cell);
+                }
+            }
+            dragLayerEl.classList.remove('hidden');
+        }
+
+        function updateDragPosition() {
+            if (!state.dragging.active) return;
+            const { piece, pointerX, pointerY, touchOffsetY } = state.dragging;
+
+            const totalWidth = piece.cols * state.cellSize + (piece.cols - 1) * state.cellGap;
+            const totalHeight = piece.rows * state.cellSize + (piece.rows - 1) * state.cellGap;
+
+            // 方塊左上角座標（置中於指標上方）
+            const topLeftX = pointerX - totalWidth / 2;
+            const topLeftY = pointerY - totalHeight / 2 - touchOffsetY;
+
+            dragLayerEl.style.transform = `translate3d(${topLeftX}px, ${topLeftY}px, 0) scale(1.03)`;
+
+            // 計算對應到 8x8 棋盤的網格座標
+            const boardRect = gridBoardEl.getBoundingClientRect();
+            const step = state.cellSize + state.cellGap;
+
+            // 以方塊第一格中心點吸附計算最近的網格行列
+            const relX = topLeftX - boardRect.left + state.cellSize * 0.5;
+            const relY = topLeftY - boardRect.top + state.cellSize * 0.5;
+
+            const targetCol = Math.floor(relX / step);
+            const targetRow = Math.floor(relY / step);
+
+            const isValid = canPlacePieceAt(piece, targetRow, targetCol);
+            if (targetRow !== state.dragging.hoverRow || targetCol !== state.dragging.hoverCol || isValid !== state.dragging.isValidHover) {
+                state.dragging.hoverRow = targetRow;
+                state.dragging.hoverCol = targetCol;
+                state.dragging.isValidHover = isValid;
+                renderBoard();
+            }
+        }
+
+        // 在整個托盤區監聽 pointerdown：第一下按下去的瞬間立即抓取對應槽位方塊
+        trayContainerEl.addEventListener('pointerdown', (e) => {
+            if (state.isGameOver || state.dragging.active) return;
+            // 僅接受滑鼠左鍵或觸控/觸控筆
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+            const slotIdx = findClosestAvailableSlot(e.clientX, e.clientY);
+            if (slotIdx === -1) return;
+
+            e.preventDefault();
+            try {
+                trayContainerEl.setPointerCapture(e.pointerId);
+            } catch (_) {}
+
+            startDragging(slotIdx, e);
+        });
+
+        function onPointerMove(e) {
+            if (!state.dragging.active) return;
+            if (state.dragging.pointerId !== null && e.pointerId !== state.dragging.pointerId) return;
+            e.preventDefault();
+            state.dragging.pointerX = e.clientX;
+            state.dragging.pointerY = e.clientY;
+            updateDragPosition();
+        }
+
+        function onPointerEnd(e) {
+            if (!state.dragging.active) return;
+            if (state.dragging.pointerId !== null && e.pointerId !== state.dragging.pointerId) return;
+
+            try {
+                if (trayContainerEl.hasPointerCapture(e.pointerId)) {
+                    trayContainerEl.releasePointerCapture(e.pointerId);
+                }
+            } catch (_) {}
+
+            const { slotIndex, piece, hoverRow, hoverCol, isValidHover } = state.dragging;
+
+            state.dragging.active = false;
+            state.dragging.pointerId = null;
+            dragLayerEl.classList.add('hidden');
+            dragLayerEl.innerHTML = '';
+
+            if (isValidHover) {
+                placePieceOnBoard(slotIndex, piece, hoverRow, hoverCol);
+            } else {
+                // 不合法位置：彈回下方原位
+                sound.playReturn();
+                renderBoard();
+                renderTray();
+            }
+        }
+
+        window.addEventListener('pointermove', onPointerMove, { passive: false });
+        window.addEventListener('pointerup', onPointerEnd);
+        window.addEventListener('pointercancel', onPointerEnd);
+
+        /**
+         * ============================================================================
+         * 6. 放置方塊、行列消除、連擊與分數結算
+         * ============================================================================
+         */
+        function placePieceOnBoard(slotIndex, piece, startRow, startCol) {
+            sound.playPlace();
+
+            let blockCount = 0;
+            const placedCoords = [];
+
+            for (let r = 0; r < piece.rows; r++) {
+                for (let c = 0; c < piece.cols; c++) {
+                    if (piece.matrix[r][c] === 1) {
+                        const targetR = startRow + r;
+                        const targetC = startCol + c;
+                        state.grid[targetR][targetC] = piece.color;
+                        placedCoords.push([targetR, targetC]);
+                        blockCount++;
+                    }
+                }
+            }
+
+            // 從托盤移除已放置的方塊
+            state.tray[slotIndex] = null;
+
+            // 基礎放置得分（每格 +10 分）
+            addScore(blockCount * 10);
+
+            // 檢查是否有填滿的橫排或直列
+            const fullRows = [];
+            const fullCols = [];
+
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                if (state.grid[r].every(cell => cell !== null)) {
+                    fullRows.push(r);
+                }
+            }
+            for (let c = 0; c < BOARD_SIZE; c++) {
+                let colFull = true;
+                for (let r = 0; r < BOARD_SIZE; r++) {
+                    if (state.grid[r][c] === null) {
+                        colFull = false;
+                        break;
+                    }
+                }
+                if (colFull) fullCols.push(c);
+            }
+
+            const totalLines = fullRows.length + fullCols.length;
+
+            if (totalLines > 0) {
+                handleLineClears(fullRows, fullCols, startRow + piece.rows / 2, startCol + piece.cols / 2);
+            } else {
+                renderBoard(placedCoords);
+                proceedAfterTurn();
+            }
+        }
+
+        function handleLineClears(fullRows, fullCols, centerRow, centerCol) {
+            const totalLines = fullRows.length + fullCols.length;
+
+            // 連擊計算：連續步驟或每輪積木內持續消除皆可累加 Combo
+            state.combo += 1;
+            state.clearedInCurrentBatch = true;
+            updateComboUI();
+
+            sound.playClear(totalLines, state.combo);
+
+            // 收集所有要消除的格子座標（避免行列交叉點重複計算）
+            const cellsToClear = new Map();
+            fullRows.forEach(r => {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    cellsToClear.set(`${r},${c}`, { r, c, color: state.grid[r][c] });
+                }
+            });
+            fullCols.forEach(c => {
+                for (let r = 0; r < BOARD_SIZE; r++) {
+                    cellsToClear.set(`${r},${c}`, { r, c, color: state.grid[r][c] });
+                }
+            });
+
+            // 觸發消除爆破動畫與粒子特效
+            renderBoard();
+            cellsToClear.forEach(({ r, c, color }) => {
+                const cellEl = cellElements[r][c];
+                const tileEl = cellEl.querySelector('.block-tile');
+                if (tileEl) {
+                    tileEl.classList.add('clearing-anim');
+                }
+                const rect = cellEl.getBoundingClientRect();
+                particles.spawnExplosion(
+                    rect.left + rect.width / 2,
+                    rect.top + rect.height / 2,
+                    color ? color.hex : '#38bdf8',
+                    8
+                );
+                state.grid[r][c] = null;
+            });
+
+            // 震動回饋
+            if (totalLines >= 2 || state.combo >= 2) {
+                boardContainer.classList.remove('shake-anim');
+                void boardContainer.offsetWidth;
+                boardContainer.classList.add('shake-anim');
+            }
+
+            // 計算消除得分（多行倍數 + 連擊加成）
+            const baseLineScore = totalLines * 100;
+            const multiLineBonus = totalLines > 1 ? totalLines * 50 : 0;
+            const comboBonus = state.combo > 1 ? (state.combo - 1) * 80 : 0;
+            let earnedScore = (baseLineScore + multiLineBonus) * Math.max(1, state.combo * 0.5 + 0.5) + comboBonus;
+            earnedScore = Math.round(earnedScore / 10) * 10;
+
+            // 檢查是否達成「全清 (All Clear)」
+            const isBoardEmpty = state.grid.every(row => row.every(cell => cell === null));
+            if (isBoardEmpty) {
+                earnedScore += 1000;
+            }
+
+            addScore(earnedScore);
+
+            // 顯示浮動讚美與分數文字
+            showClearFeedback(totalLines, state.combo, earnedScore, isBoardEmpty, centerRow, centerCol);
+
+            // 等待消除動畫完成後刷新棋盤並檢查下一輪
+            setTimeout(() => {
+                renderBoard();
+                proceedAfterTurn();
+            }, 280);
+        }
+
+        function showClearFeedback(totalLines, combo, scoreGained, isAllClear, centerRow, centerCol) {
+            const boardRect = gridBoardEl.getBoundingClientRect();
+            const step = state.cellSize + state.cellGap;
+            const x = Math.min(Math.max(boardRect.left + centerCol * step, boardRect.left + 70), boardRect.right - 70);
+            const y = Math.min(Math.max(boardRect.top + centerRow * step, boardRect.top + 50), boardRect.bottom - 50);
+
+            let praise = '';
+            let gradient = 'from-amber-300 via-yellow-200 to-amber-400';
+
+            if (isAllClear) {
+                praise = 'ALL CLEAR! 全清獎勵!';
+                gradient = 'from-emerald-300 via-teal-200 to-cyan-300';
+            } else if (totalLines >= 4) {
+                praise = 'UNBELIEVABLE!';
+                gradient = 'from-fuchsia-400 via-pink-300 to-amber-300';
+            } else if (totalLines === 3) {
+                praise = 'AMAZING!';
+                gradient = 'from-orange-400 via-amber-300 to-yellow-200';
+            } else if (totalLines === 2) {
+                praise = 'GREAT!';
+                gradient = 'from-sky-300 via-cyan-200 to-indigo-300';
+            }
+
+            const banner = document.createElement('div');
+            banner.className = 'floating-banner';
+            banner.style.left = `${x}px`;
+            banner.style.top = `${y}px`;
+
+            let html = '';
+            if (praise) {
+                html += `<div class="text-xl sm:text-2xl bg-gradient-to-r ${gradient} bg-clip-text text-transparent tracking-wider">${praise}</div>`;
+            }
+            if (combo > 1) {
+                html += `<div class="text-base sm:text-lg text-orange-300">COMBO x${combo}!</div>`;
+            }
+            html += `<div class="text-lg sm:text-xl text-white">+${scoreGained}</div>`;
+
+            banner.innerHTML = html;
+            document.body.appendChild(banner);
+
+            setTimeout(() => {
+                banner.remove();
+            }, 1150);
+        }
+
+        function proceedAfterTurn() {
+            const isTrayEmpty = state.tray.every(item => item === null);
+
+            if (isTrayEmpty) {
+                // 如果這一組 3 個方塊都沒觸發任何消除，連擊歸零
+                if (!state.clearedInCurrentBatch) {
+                    state.combo = 0;
+                    updateComboUI();
+                }
+                refillTray();
+            } else {
+                renderTray();
+                checkGameOver();
+            }
+        }
+
+        /**
+         * 檢查是否所有剩餘待選方塊都無法放入 8x8 棋盤
+         */
+        function checkGameOver() {
+            const remainingPieces = state.tray.filter(p => p !== null);
+            if (remainingPieces.length === 0) return;
+
+            const canContinue = remainingPieces.some(piece => canPieceFitAnywhere(piece));
+            if (!canContinue) {
+                state.isGameOver = true;
+                sound.playGameOver();
+                setTimeout(() => {
+                    finalScoreEl.textContent = state.score.toLocaleString();
+                    finalBestEl.textContent = state.bestScore.toLocaleString();
+                    gameOverModal.classList.remove('hidden');
+                    gameOverModal.classList.add('flex');
+                }, 550);
+            }
+        }
+
+        /**
+         * 分數滾動更新與最高分儲存
+         */
+        function addScore(points) {
+            state.score += points;
+            if (state.score > state.bestScore) {
+                state.bestScore = state.score;
+                localStorage.setItem(STORAGE_KEY, String(state.bestScore));
+                bestScoreEl.textContent = state.bestScore.toLocaleString();
+            }
+            animateScoreCounter();
+        }
+
+        function animateScoreCounter() {
+            const diff = state.score - state.displayScore;
+            if (diff <= 0) {
+                state.displayScore = state.score;
+                currentScoreEl.textContent = state.displayScore.toLocaleString();
+                return;
+            }
+            state.displayScore += Math.ceil(diff * 0.35);
+            currentScoreEl.textContent = state.displayScore.toLocaleString();
+            requestAnimationFrame(animateScoreCounter);
+        }
+
+        function updateComboUI() {
+            if (state.combo > 1) {
+                comboTextEl.textContent = `COMBO x${state.combo}`;
+                comboBadgeEl.classList.remove('opacity-0', 'scale-90');
+                comboBadgeEl.classList.add('opacity-100', 'scale-100');
+            } else {
+                comboBadgeEl.classList.add('opacity-0', 'scale-90');
+                comboBadgeEl.classList.remove('opacity-100', 'scale-100');
+            }
+        }
+
+        /**
+         * 重置並開始新局
+         */
+        function resetGame() {
+            state.grid = Array.from({ length: BOARD_SIZE }, () => Array(BOARD_SIZE).fill(null));
+            state.score = 0;
+            state.displayScore = 0;
+            state.combo = 0;
+            state.clearedInCurrentBatch = false;
+            state.isGameOver = false;
+            state.dragging.active = false;
+            state.dragging.pointerId = null;
+
+            currentScoreEl.textContent = '0';
+            bestScoreEl.textContent = state.bestScore.toLocaleString();
+            updateComboUI();
+
+            gameOverModal.classList.add('hidden');
+            gameOverModal.classList.remove('flex');
+
+            renderBoard();
+            refillTray();
+        }
+
+        // 按鈕事件綁定
+        document.getElementById('sound-toggle-btn').addEventListener('click', () => {
+            const isMuted = sound.toggleMute();
+            document.getElementById('icon-sound-on').classList.toggle('hidden', isMuted);
+            document.getElementById('icon-sound-off').classList.toggle('hidden', !isMuted);
+        });
+
+        document.getElementById('restart-header-btn').addEventListener('click', () => {
+            sound.playPickup();
+            resetGame();
+        });
+
+        document.getElementById('play-again-btn').addEventListener('click', () => {
+            sound.playPickup();
+            resetGame();
+        });
+
+        window.addEventListener('resize', updateLayoutMetrics);
+
+        // 啟動遊戲
+        window.onload = () => {
+            initBoardDOM();
+            resetGame();
+        };
+    </script>
+</body>
+</html>

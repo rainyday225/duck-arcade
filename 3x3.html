@@ -1,0 +1,1358 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>3x3 滑塊拼圖遊戲 | 離線版</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+
+    body {
+      font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    /* 拼圖板容器 */
+    .puzzle-board {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      background-color: #1e293b;
+      border-radius: 1rem;
+      overflow: hidden;
+      box-shadow: inset 0 4px 12px rgba(0, 0, 0, 0.45), 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+      touch-action: none;
+    }
+
+    /* 單個拼圖方塊 */
+    .puzzle-tile {
+      position: absolute;
+      width: calc(33.3333% - 4px);
+      height: calc(33.3333% - 4px);
+      margin: 2px;
+      border-radius: 0.65rem;
+      background-size: 300% 300%;
+      background-repeat: no-repeat;
+      cursor: pointer;
+      transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.15s ease;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.35);
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-start;
+      will-change: transform;
+    }
+
+    .puzzle-tile:hover {
+      filter: brightness(1.04);
+    }
+
+    .puzzle-tile:active {
+      filter: brightness(0.96);
+    }
+
+    /* 拼圖數字提示徽章 */
+    .tile-badge {
+      background: rgba(15, 23, 42, 0.68);
+      color: #f8fafc;
+      font-weight: 700;
+      font-size: 0.85rem;
+      line-height: 1;
+      padding: 4px 7px;
+      margin: 6px;
+      border-radius: 0.4rem;
+      backdrop-filter: blur(4px);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    /* 預覽原圖覆蓋層 */
+    .peek-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 20;
+      background-size: cover;
+      background-position: center;
+      border-radius: 1rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .peek-overlay.active {
+      opacity: 1;
+    }
+
+    /* 限時模式倒數緊急閃爍 */
+    @keyframes pulse-urgent {
+      0%, 100% { transform: scale(1); color: #ef4444; }
+      50% { transform: scale(1.08); color: #dc2626; }
+    }
+    .timer-urgent {
+      animation: pulse-urgent 0.8s infinite ease-in-out;
+    }
+
+    /* 彈窗動畫 */
+    @keyframes modal-pop {
+      0% { opacity: 0; transform: scale(0.92) translateY(10px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .modal-animate {
+      animation: modal-pop 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col items-center justify-between py-4 px-3 sm:py-6 sm:px-4">
+
+  <!-- 頂部標題與音效開關 -->
+  <header class="w-full max-w-md flex items-center justify-between mb-3">
+    <div class="flex items-center gap-2.5">
+      <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md font-black text-lg">
+        3×3
+      </div>
+      <div>
+        <h1 class="text-xl font-extrabold tracking-tight text-slate-900 leading-tight">滑塊拼圖</h1>
+        <p class="text-xs text-slate-500 font-medium">離線可玩 · 自由換圖 · 雙模式挑戰</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <!-- 提示數字開關 -->
+      <button id="btn-toggle-numbers" type="button" title="顯示/隱藏數字提示"
+        class="px-2.5 py-2 rounded-xl bg-white border border-slate-200 shadow-sm text-xs font-bold text-slate-700 hover:bg-slate-50 active:scale-95 transition flex items-center gap-1">
+        <span id="icon-numbers" class="text-indigo-600 font-black">#</span>
+        <span>數字提示</span>
+      </button>
+
+      <!-- 音效開關 -->
+      <button id="btn-toggle-sound" type="button" title="開啟/靜音音效"
+        class="p-2 rounded-xl bg-white border border-slate-200 shadow-sm text-slate-700 hover:bg-slate-50 active:scale-95 transition">
+        <!-- 喇叭開啟圖示 -->
+        <svg id="icon-sound-on" class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14" />
+        </svg>
+        <!-- 靜音圖示 -->
+        <svg id="icon-sound-off" class="w-5 h-5 text-slate-400 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5zM23 9l-6 6M17 9l6 6" />
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- 主遊戲卡片區域 -->
+  <main class="w-full max-w-md bg-white rounded-3xl shadow-xl border border-slate-200/80 p-4 sm:p-5 flex flex-col gap-4">
+
+    <!-- 模式切換分頁 -->
+    <div class="bg-slate-100 p-1 rounded-2xl grid grid-cols-2 gap-1">
+      <button id="mode-endless" type="button"
+        class="py-2 px-3 rounded-xl text-sm font-bold transition-all bg-white text-indigo-600 shadow-sm flex items-center justify-center gap-1.5">
+        <span>∞</span>
+        <span>無限計時</span>
+      </button>
+      <button id="mode-timed" type="button"
+        class="py-2 px-3 rounded-xl text-sm font-bold transition-all text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5">
+        <span>⏱️</span>
+        <span>限時關卡</span>
+      </button>
+    </div>
+
+    <!-- 限時難度選擇列（僅限時模式顯示） -->
+    <div id="timed-options" class="hidden flex items-center justify-between bg-amber-50 border border-amber-200/80 rounded-2xl px-3.5 py-2">
+      <span class="text-xs font-bold text-amber-800">關卡時限：</span>
+      <div class="flex items-center gap-1.5">
+        <button type="button" data-seconds="60" class="time-preset px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-amber-800 border border-amber-200 hover:bg-amber-100 transition">60秒</button>
+        <button type="button" data-seconds="90" class="time-preset px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500 text-white shadow-sm transition">90秒</button>
+        <button type="button" data-seconds="120" class="time-preset px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-amber-800 border border-amber-200 hover:bg-amber-100 transition">120秒</button>
+      </div>
+    </div>
+
+    <!-- 數據儀表板：時間、步數、最佳紀錄 -->
+    <div class="grid grid-cols-3 gap-2.5">
+      <div class="bg-slate-50 border border-slate-200/70 rounded-2xl p-2.5 text-center">
+        <div id="timer-label" class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">經過時間</div>
+        <div id="timer-display" class="text-lg sm:text-xl font-black text-slate-800 tabular-nums mt-0.5">00:00</div>
+      </div>
+
+      <div class="bg-slate-50 border border-slate-200/70 rounded-2xl p-2.5 text-center">
+        <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">移動步數</div>
+        <div id="moves-display" class="text-lg sm:text-xl font-black text-indigo-600 tabular-nums mt-0.5">0</div>
+      </div>
+
+      <div class="bg-slate-50 border border-slate-200/70 rounded-2xl p-2.5 text-center">
+        <div id="best-label" class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">最佳紀錄</div>
+        <div id="best-display" class="text-sm sm:text-base font-extrabold text-emerald-600 tabular-nums mt-1">--</div>
+      </div>
+    </div>
+
+    <!-- 拼圖主畫布 -->
+    <div class="relative w-full">
+      <div id="puzzle-board" class="puzzle-board" aria-label="3x3 滑塊拼圖棋盤">
+        <!-- 拼圖方塊由 JS 動態生成 -->
+        <div id="peek-overlay" class="peek-overlay"></div>
+      </div>
+    </div>
+
+    <!-- 操作控制按鈕列 -->
+    <div class="grid grid-cols-2 gap-2.5">
+      <button id="btn-peek" type="button"
+        class="py-2.5 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200/80 active:bg-indigo-100 text-slate-700 font-bold text-sm transition flex items-center justify-center gap-2 border border-slate-200/80">
+        <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+        </svg>
+        <span>按住查看原圖</span>
+      </button>
+
+      <button id="btn-shuffle" type="button"
+        class="py-2.5 px-4 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white font-bold text-sm shadow-md shadow-indigo-200 transition flex items-center justify-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+        <span>重新洗牌</span>
+      </button>
+    </div>
+
+    <!-- 圖片庫與自由上傳區 -->
+    <div class="pt-2 border-t border-slate-100">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-bold text-slate-500">選擇拼圖圖片（支援離線預設或自由上傳）</span>
+        <span id="current-image-name" class="text-xs font-bold text-indigo-600">經典數字盤</span>
+      </div>
+
+      <div class="grid grid-cols-5 gap-2">
+        <!-- 4 張內建預設離線圖示按鈕 + 1 個上傳按鈕 -->
+        <button type="button" data-preset="0" class="preset-thumb relative aspect-square rounded-xl overflow-hidden border-2 border-indigo-600 ring-2 ring-indigo-200 transition active:scale-95" title="經典數字盤"></button>
+        <button type="button" data-preset="1" class="preset-thumb relative aspect-square rounded-xl overflow-hidden border-2 border-transparent hover:border-slate-300 transition active:scale-95" title="萌寵柴犬"></button>
+        <button type="button" data-preset="2" class="preset-thumb relative aspect-square rounded-xl overflow-hidden border-2 border-transparent hover:border-slate-300 transition active:scale-95" title="富士山日出"></button>
+        <button type="button" data-preset="3" class="preset-thumb relative aspect-square rounded-xl overflow-hidden border-2 border-transparent hover:border-slate-300 transition active:scale-95" title="宇宙火箭"></button>
+
+        <!-- 自由上傳按鈕 -->
+        <label for="image-upload" title="從裝置上傳自訂圖片"
+          class="cursor-pointer aspect-square rounded-xl border-2 border-dashed border-slate-300 hover:border-indigo-500 hover:bg-indigo-50/60 flex flex-col items-center justify-center text-slate-500 hover:text-indigo-600 transition active:scale-95">
+          <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+          </svg>
+          <span class="text-[10px] font-bold leading-none">上傳圖片</span>
+        </label>
+        <input id="image-upload" type="file" accept="image/*" class="hidden" />
+      </div>
+    </div>
+  </main>
+
+  <!-- 底部操作說明 -->
+  <footer class="w-full max-w-md text-center mt-3 text-xs text-slate-400">
+    點擊相鄰方塊、滑動螢幕或使用鍵盤方向鍵移動 · 100% 離線可玩
+  </footer>
+
+  <!-- 過關 / 失敗結算彈窗 -->
+  <div id="result-modal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="modal-animate bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 text-center">
+      <!-- 狀態圖示 -->
+      <div id="modal-icon" class="w-16 h-16 mx-auto rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-3xl mb-3 shadow-inner">
+        🎉
+      </div>
+
+      <h2 id="modal-title" class="text-2xl font-black text-slate-900">恭喜完成拼圖！</h2>
+      <p id="modal-subtitle" class="text-sm text-slate-500 mt-1">太厲害了，所有方塊都已歸位！</p>
+
+      <!-- 完成後展示完整原圖預覽 -->
+      <div id="modal-preview-wrap" class="my-4 mx-auto w-36 h-36 rounded-2xl overflow-hidden shadow-md border-2 border-slate-200">
+        <img id="modal-preview-img" src="" alt="拼圖原圖" class="w-full h-full object-cover" />
+      </div>
+
+      <!-- 成績統計 -->
+      <div class="grid grid-cols-2 gap-3 bg-slate-50 rounded-2xl p-3 mb-5 border border-slate-200/70">
+        <div>
+          <div class="text-xs font-bold text-slate-400">花費時間</div>
+          <div id="modal-time" class="text-lg font-black text-slate-800 mt-0.5">00:00</div>
+        </div>
+        <div>
+          <div class="text-xs font-bold text-slate-400">總步數</div>
+          <div id="modal-moves" class="text-lg font-black text-indigo-600 mt-0.5">0 步</div>
+        </div>
+      </div>
+
+      <div id="modal-record-badge" class="hidden mb-4 py-1.5 px-3 rounded-xl bg-amber-100 text-amber-800 text-xs font-extrabold">
+        🏆 刷新本模式最佳紀錄！
+      </div>
+
+      <div class="flex gap-2.5">
+        <button id="btn-modal-close" type="button"
+          class="flex-1 py-3 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition">
+          關閉檢視
+        </button>
+        <button id="btn-modal-again" type="button"
+          class="flex-1 py-3 px-4 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-200 transition">
+          再玩一局
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 提示訊息 Toast（取代 alert） -->
+  <div id="toast-msg" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-opacity duration-200 bg-slate-900/90 text-white text-xs font-bold px-4 py-2.5 rounded-full shadow-lg">
+    訊息提示
+  </div>
+
+  <script>
+    /**
+     * 3x3 滑塊拼圖遊戲核心邏輯（完全離線可執行）
+     */
+    (function () {
+      // ==========================================
+      // 1. 內建離線預設圖片生成器 (HTML5 Canvas 繪製高解析度正方形圖)
+      // ==========================================
+      function generatePresetImages() {
+        const size = 600;
+        const presets = [];
+
+        // 預設 1: 經典彩色數字盤 (高對比漸層方塊)
+        (() => {
+          const canvas = document.createElement('canvas');
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          const colors = [
+            ['#6366f1', '#4f46e5'], ['#3b82f6', '#2563eb'], ['#06b6d4', '#0891b2'],
+            ['#10b981', '#059669'], ['#84cc16', '#65a30d'], ['#f59e0b', '#d97706'],
+            ['#f97316', '#ea580c'], ['#ec4899', '#db2777'], ['#64748b', '#475569']
+          ];
+          const cell = size / 3;
+          for (let i = 0; i < 9; i++) {
+            const r = Math.floor(i / 3);
+            const c = i % 3;
+            const x = c * cell;
+            const y = r * cell;
+            const grad = ctx.createLinearGradient(x, y, x + cell, y + cell);
+            grad.addColorStop(0, colors[i][0]);
+            grad.addColorStop(1, colors[i][1]);
+            ctx.fillStyle = grad;
+            ctx.fillRect(x, y, cell, cell);
+
+            // 裝飾邊框
+            ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+            ctx.lineWidth = 6;
+            ctx.strokeRect(x + 8, y + 8, cell - 16, cell - 16);
+
+            // 中央大數字
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '900 96px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(String(i + 1), x + cell / 2, y + cell / 2 + 6);
+          }
+          presets.push({ name: '經典數字盤', url: canvas.toDataURL('image/png') });
+        })();
+
+        // 預設 2: 萌寵柴犬插畫
+        (() => {
+          const canvas = document.createElement('canvas');
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext('2d');
+
+          // 暖色背景
+          const bg = ctx.createRadialGradient(300, 300, 40, 300, 300, 420);
+          bg.addColorStop(0, '#fef3c7');
+          bg.addColorStop(1, '#fcd34d');
+          ctx.fillStyle = bg;
+          ctx.fillRect(0, 0, size, size);
+
+          // 裝飾波點
+          ctx.fillStyle = 'rgba(245, 158, 11, 0.25)';
+          for (let y = 50; y < size; y += 100) {
+            for (let x = 50; x < size; x += 100) {
+              ctx.beginPath();
+              ctx.arc(x, y, 16, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+
+          // 左耳與右耳
+          ctx.fillStyle = '#d97706';
+          ctx.beginPath();
+          ctx.moveTo(140, 230);
+          ctx.lineTo(115, 95);
+          ctx.lineTo(245, 165);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.moveTo(460, 230);
+          ctx.lineTo(485, 95);
+          ctx.lineTo(355, 165);
+          ctx.closePath();
+          ctx.fill();
+
+          // 耳朵內側
+          ctx.fillStyle = '#fef3c7';
+          ctx.beginPath();
+          ctx.moveTo(155, 210);
+          ctx.lineTo(138, 125);
+          ctx.lineTo(222, 170);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.moveTo(445, 210);
+          ctx.lineTo(462, 125);
+          ctx.lineTo(378, 170);
+          ctx.closePath();
+          ctx.fill();
+
+          // 柴犬臉部輪廓
+          ctx.fillStyle = '#f59e0b';
+          ctx.beginPath();
+          ctx.ellipse(300, 320, 185, 165, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 白色臉頰與嘴巴區域
+          ctx.fillStyle = '#fffbeb';
+          ctx.beginPath();
+          ctx.ellipse(300, 370, 155, 112, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 眉毛白點
+          ctx.beginPath();
+          ctx.ellipse(235, 250, 22, 14, -0.2, 0, Math.PI * 2);
+          ctx.ellipse(365, 250, 22, 14, 0.2, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 眼睛
+          ctx.fillStyle = '#1e293b';
+          ctx.beginPath();
+          ctx.arc(232, 295, 20, 0, Math.PI * 2);
+          ctx.arc(368, 295, 20, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 眼睛高光
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(226, 289, 7, 0, Math.PI * 2);
+          ctx.arc(362, 289, 7, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 腮紅
+          ctx.fillStyle = 'rgba(244, 63, 94, 0.35)';
+          ctx.beginPath();
+          ctx.ellipse(185, 340, 26, 16, 0, 0, Math.PI * 2);
+          ctx.ellipse(415, 340, 26, 16, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 鼻子
+          ctx.fillStyle = '#1e293b';
+          ctx.beginPath();
+          ctx.ellipse(300, 348, 24, 16, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 微笑嘴巴
+          ctx.strokeStyle = '#1e293b';
+          ctx.lineWidth = 8;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(300, 364);
+          ctx.lineTo(300, 386);
+          ctx.moveTo(265, 388);
+          ctx.quadraticCurveTo(282, 405, 300, 386);
+          ctx.quadraticCurveTo(318, 405, 335, 388);
+          ctx.stroke();
+
+          // 紅色項圈與鈴鐺
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(185, 468, 230, 34);
+          ctx.fillStyle = '#fbbf24';
+          ctx.beginPath();
+          ctx.arc(300, 495, 22, 0, Math.PI * 2);
+          ctx.fill();
+
+          presets.push({ name: '萌寵柴犬', url: canvas.toDataURL('image/png') });
+        })();
+
+        // 預設 3: 富士山日出風景
+        (() => {
+          const canvas = document.createElement('canvas');
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext('2d');
+
+          // 晨曦漸層天空
+          const sky = ctx.createLinearGradient(0, 0, 0, 420);
+          sky.addColorStop(0, '#1e3a8a');
+          sky.addColorStop(0.5, '#fb7185');
+          sky.addColorStop(1, '#fde68a');
+          ctx.fillStyle = sky;
+          ctx.fillRect(0, 0, size, size);
+
+          // 太陽
+          ctx.fillStyle = '#fef08a';
+          ctx.beginPath();
+          ctx.arc(430, 175, 68, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 富士山主體
+          ctx.fillStyle = '#334155';
+          ctx.beginPath();
+          ctx.moveTo(40, 440);
+          ctx.lineTo(245, 195);
+          ctx.lineTo(355, 195);
+          ctx.lineTo(560, 440);
+          ctx.closePath();
+          ctx.fill();
+
+          // 山頂積雪
+          ctx.fillStyle = '#f8fafc';
+          ctx.beginPath();
+          ctx.moveTo(245, 195);
+          ctx.lineTo(355, 195);
+          ctx.lineTo(405, 260);
+          ctx.lineTo(365, 245);
+          ctx.lineTo(335, 275);
+          ctx.lineTo(300, 245);
+          ctx.lineTo(265, 275);
+          ctx.lineTo(235, 245);
+          ctx.lineTo(195, 260);
+          ctx.closePath();
+          ctx.fill();
+
+          // 湖面
+          const lake = ctx.createLinearGradient(0, 440, 0, 600);
+          lake.addColorStop(0, '#0284c7');
+          lake.addColorStop(1, '#1e3a8a');
+          ctx.fillStyle = lake;
+          ctx.fillRect(0, 440, size, 160);
+
+          // 湖面波光
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+          ctx.lineWidth = 5;
+          ctx.lineCap = 'round';
+          [475, 510, 545, 575].forEach((y, idx) => {
+            ctx.beginPath();
+            ctx.moveTo(140 + idx * 25, y);
+            ctx.lineTo(460 - idx * 25, y);
+            ctx.stroke();
+          });
+
+          // 雲朵
+          ctx.fillStyle = 'rgba(255,255,255,0.85)';
+          const drawCloud = (cx, cy, s) => {
+            ctx.beginPath();
+            ctx.arc(cx, cy, 26 * s, 0, Math.PI * 2);
+            ctx.arc(cx + 28 * s, cy - 8 * s, 32 * s, 0, Math.PI * 2);
+            ctx.arc(cx + 58 * s, cy, 24 * s, 0, Math.PI * 2);
+            ctx.fill();
+          };
+          drawCloud(85, 135, 1.1);
+          drawCloud(410, 290, 0.9);
+
+          presets.push({ name: '富士山日出', url: canvas.toDataURL('image/png') });
+        })();
+
+        // 預設 4: 宇宙星空火箭
+        (() => {
+          const canvas = document.createElement('canvas');
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext('2d');
+
+          // 深空背景
+          const space = ctx.createLinearGradient(0, 0, size, size);
+          space.addColorStop(0, '#090d16');
+          space.addColorStop(0.5, '#1e1b4b');
+          space.addColorStop(1, '#312e81');
+          ctx.fillStyle = space;
+          ctx.fillRect(0, 0, size, size);
+
+          // 星星
+          const stars = [
+            [80, 90, 4], [180, 60, 3], [510, 95, 5], [480, 210, 3],
+            [95, 310, 4], [140, 490, 5], [490, 480, 4], [380, 75, 3],
+            [260, 530, 3], [530, 350, 4], [65, 195, 3]
+          ];
+          ctx.fillStyle = '#fef08a';
+          stars.forEach(([x, y, r]) => {
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.fill();
+          });
+
+          // 土星與光環
+          ctx.fillStyle = '#f59e0b';
+          ctx.beginPath();
+          ctx.arc(135, 145, 42, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#fde68a';
+          ctx.lineWidth = 8;
+          ctx.beginPath();
+          ctx.ellipse(135, 145, 72, 18, -0.35, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // 火箭（傾斜 45 度飛行）
+          ctx.save();
+          ctx.translate(315, 295);
+          ctx.rotate(Math.PI / 4);
+
+          // 噴射火焰
+          ctx.fillStyle = '#f97316';
+          ctx.beginPath();
+          ctx.moveTo(-36, 95);
+          ctx.lineTo(0, 185);
+          ctx.lineTo(36, 95);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.fillStyle = '#fef08a';
+          ctx.beginPath();
+          ctx.moveTo(-20, 95);
+          ctx.lineTo(0, 150);
+          ctx.lineTo(20, 95);
+          ctx.closePath();
+          ctx.fill();
+
+          // 左右尾翼
+          ctx.fillStyle = '#ef4444';
+          ctx.beginPath();
+          ctx.moveTo(-55, 35);
+          ctx.lineTo(-95, 105);
+          ctx.lineTo(-45, 95);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.moveTo(55, 35);
+          ctx.lineTo(95, 105);
+          ctx.lineTo(45, 95);
+          ctx.closePath();
+          ctx.fill();
+
+          // 火箭主艙身
+          ctx.fillStyle = '#f8fafc';
+          ctx.beginPath();
+          ctx.ellipse(0, 0, 58, 115, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 紅色鼻錐
+          ctx.fillStyle = '#ef4444';
+          ctx.beginPath();
+          ctx.arc(0, -45, 53, Math.PI * 1.12, Math.PI * 1.88);
+          ctx.lineTo(0, -125);
+          ctx.closePath();
+          ctx.fill();
+
+          // 舷窗
+          ctx.fillStyle = '#38bdf8';
+          ctx.beginPath();
+          ctx.arc(0, -10, 26, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#94a3b8';
+          ctx.lineWidth = 7;
+          ctx.stroke();
+
+          ctx.restore();
+
+          presets.push({ name: '宇宙火箭', url: canvas.toDataURL('image/png') });
+        })();
+
+        return presets;
+      }
+
+      // ==========================================
+      // 2. Web Audio API 離線音效系統
+      // ==========================================
+      class SoundEngine {
+        constructor() {
+          this.muted = false;
+          this.ctx = null;
+        }
+
+        init() {
+          if (!this.ctx) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) {
+              this.ctx = new AudioCtx();
+            }
+          }
+          if (this.ctx && this.ctx.state === 'suspended') {
+            this.ctx.resume();
+          }
+        }
+
+        playSlide() {
+          if (this.muted) return;
+          try {
+            this.init();
+            if (!this.ctx) return;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            const now = this.ctx.currentTime;
+            osc.frequency.setValueAtTime(320, now);
+            osc.frequency.exponentialRampToValueAtTime(520, now + 0.08);
+            gain.gain.setValueAtTime(0.14, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.09);
+          } catch (e) {}
+        }
+
+        playWin() {
+          if (this.muted) return;
+          try {
+            this.init();
+            if (!this.ctx) return;
+            const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+            notes.forEach((freq, idx) => {
+              const osc = this.ctx.createOscillator();
+              const gain = this.ctx.createGain();
+              osc.type = 'triangle';
+              const start = this.ctx.currentTime + idx * 0.1;
+              osc.frequency.setValueAtTime(freq, start);
+              gain.gain.setValueAtTime(0.18, start);
+              gain.gain.exponentialRampToValueAtTime(0.001, start + 0.35);
+              osc.connect(gain);
+              gain.connect(this.ctx.destination);
+              osc.start(start);
+              osc.stop(start + 0.36);
+            });
+          } catch (e) {}
+        }
+
+        playFail() {
+          if (this.muted) return;
+          try {
+            this.init();
+            if (!this.ctx) return;
+            const notes = [349.23, 293.66, 220.00];
+            notes.forEach((freq, idx) => {
+              const osc = this.ctx.createOscillator();
+              const gain = this.ctx.createGain();
+              osc.type = 'sawtooth';
+              const start = this.ctx.currentTime + idx * 0.16;
+              osc.frequency.setValueAtTime(freq, start);
+              gain.gain.setValueAtTime(0.1, start);
+              gain.gain.exponentialRampToValueAtTime(0.001, start + 0.3);
+              osc.connect(gain);
+              gain.connect(this.ctx.destination);
+              osc.start(start);
+              osc.stop(start + 0.32);
+            });
+          } catch (e) {}
+        }
+      }
+
+      // ==========================================
+      // 3. 遊戲狀態與 DOM 參照
+      // ==========================================
+      const presetImages = generatePresetImages();
+      const sound = new SoundEngine();
+
+      const state = {
+        board: [0, 1, 2, 3, 4, 5, 6, 7, 8], // 0~7 為拼圖塊，8 為空格
+        mode: 'endless', // 'endless' | 'timed'
+        timeLimit: 90,   // 限時模式秒數 (60 / 90 / 120)
+        elapsedSeconds: 0,
+        remainingSeconds: 90,
+        moves: 0,
+        isPlaying: false,
+        isSolved: false,
+        isFailed: false,
+        showNumbers: true,
+        currentImageUrl: presetImages[0].url,
+        currentImageName: presetImages[0].name,
+        timerInterval: null
+      };
+
+      // DOM 元素
+      const elBoard = document.getElementById('puzzle-board');
+      const elPeekOverlay = document.getElementById('peek-overlay');
+      const elTimerLabel = document.getElementById('timer-label');
+      const elTimerDisplay = document.getElementById('timer-display');
+      const elMovesDisplay = document.getElementById('moves-display');
+      const elBestLabel = document.getElementById('best-label');
+      const elBestDisplay = document.getElementById('best-display');
+      const elTimedOptions = document.getElementById('timed-options');
+      const elCurrentImgName = document.getElementById('current-image-name');
+
+      const btnModeEndless = document.getElementById('mode-endless');
+      const btnModeTimed = document.getElementById('mode-timed');
+      const btnToggleNumbers = document.getElementById('btn-toggle-numbers');
+      const btnToggleSound = document.getElementById('btn-toggle-sound');
+      const btnPeek = document.getElementById('btn-peek');
+      const btnShuffle = document.getElementById('btn-shuffle');
+      const inputUpload = document.getElementById('image-upload');
+
+      // Modal 元素
+      const elModal = document.getElementById('result-modal');
+      const elModalIcon = document.getElementById('modal-icon');
+      const elModalTitle = document.getElementById('modal-title');
+      const elModalSubtitle = document.getElementById('modal-subtitle');
+      const elModalPreviewImg = document.getElementById('modal-preview-img');
+      const elModalTime = document.getElementById('modal-time');
+      const elModalMoves = document.getElementById('modal-moves');
+      const elModalRecordBadge = document.getElementById('modal-record-badge');
+      const btnModalClose = document.getElementById('btn-modal-close');
+      const btnModalAgain = document.getElementById('btn-modal-again');
+
+      // 儲存方塊 DOM 的映射表 (tileValue 0..7 -> HTMLElement)
+      const tileElements = {};
+
+      // ==========================================
+      // 4. 工具函式：時間格式化、Toast 提示、最佳紀錄
+      // ==========================================
+      function formatTime(totalSec) {
+        const sec = Math.max(0, Math.floor(totalSec));
+        const m = Math.floor(sec / 60).toString().padStart(2, '0');
+        const s = (sec % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+      }
+
+      let toastTimer = null;
+      function showToast(msg) {
+        const elToast = document.getElementById('toast-msg');
+        elToast.textContent = msg;
+        elToast.classList.remove('opacity-0');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+          elToast.classList.add('opacity-0');
+        }, 2000);
+      }
+
+      function getBestStorageKey() {
+        return state.mode === 'endless'
+          ? 'sliding_puzzle_3x3_best_endless'
+          : `sliding_puzzle_3x3_best_timed_${state.timeLimit}`;
+      }
+
+      function loadBestRecord() {
+        try {
+          const raw = localStorage.getItem(getBestStorageKey());
+          return raw ? JSON.parse(raw) : null;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function saveBestRecord(timeSec, moves) {
+        try {
+          const current = loadBestRecord();
+          let isNewBest = false;
+          if (!current) {
+            isNewBest = true;
+          } else if (timeSec < current.time || (timeSec === current.time && moves < current.moves)) {
+            isNewBest = true;
+          }
+          if (isNewBest) {
+            localStorage.setItem(getBestStorageKey(), JSON.stringify({ time: timeSec, moves }));
+          }
+          updateBestDisplay();
+          return isNewBest;
+        } catch (e) {
+          return false;
+        }
+      }
+
+      function updateBestDisplay() {
+        const best = loadBestRecord();
+        if (!best) {
+          elBestDisplay.textContent = '尚無紀錄';
+          elBestDisplay.classList.remove('text-emerald-600');
+          elBestDisplay.classList.add('text-slate-400');
+        } else {
+          elBestDisplay.textContent = `${formatTime(best.time)} / ${best.moves}步`;
+          elBestDisplay.classList.add('text-emerald-600');
+          elBestDisplay.classList.remove('text-slate-400');
+        }
+      }
+
+      // ==========================================
+      // 5. 數學可解性驗證與隨機洗牌演算法
+      // ==========================================
+      /**
+       * 計算逆序數 (Inversions)
+       * 對於 3x3 (奇數寬度) 拼圖：
+       * 當空格在任意位置時，只要 0~7 的逆序數總和為「偶數」，該盤面必定 100% 可解！
+       */
+      function isSolvable(arr) {
+        let inversions = 0;
+        for (let i = 0; i < arr.length; i++) {
+          if (arr[i] === 8) continue; // 忽略空格
+          for (let j = i + 1; j < arr.length; j++) {
+            if (arr[j] === 8) continue;
+            if (arr[i] > arr[j]) {
+              inversions++;
+            }
+          }
+        }
+        return inversions % 2 === 0;
+      }
+
+      function isBoardSolved(arr) {
+        for (let i = 0; i < 9; i++) {
+          if (arr[i] !== i) return false;
+        }
+        return true;
+      }
+
+      function generateShuffledBoard() {
+        let arr = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+        do {
+          // Fisher-Yates 洗牌
+          for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+          }
+        } while (!isSolvable(arr) || isBoardSolved(arr));
+        return arr;
+      }
+
+      // ==========================================
+      // 6. 棋盤渲染與方塊定位
+      // ==========================================
+      function initBoardDOM() {
+        // 清除舊方塊（保留 peek-overlay）
+        Object.values(tileElements).forEach(el => el.remove());
+
+        for (let tileVal = 0; tileVal < 8; tileVal++) {
+          const tile = document.createElement('div');
+          tile.className = 'puzzle-tile';
+          tile.dataset.tile = String(tileVal);
+
+          // 計算該方塊對應原圖的裁切位置 (0%, 50%, 100%)
+          const origRow = Math.floor(tileVal / 3);
+          const origCol = tileVal % 3;
+          tile.style.backgroundPosition = `${origCol * 50}% ${origRow * 50}%`;
+          tile.style.backgroundImage = `url("${state.currentImageUrl}")`;
+
+          // 數字提示標籤
+          const badge = document.createElement('span');
+          badge.className = 'tile-badge';
+          badge.textContent = String(tileVal + 1);
+          if (!state.showNumbers) {
+            badge.style.opacity = '0';
+          }
+          tile.appendChild(badge);
+
+          // 點擊移動事件
+          tile.addEventListener('click', () => {
+            const currentIndex = state.board.indexOf(tileVal);
+            tryMoveIndex(currentIndex);
+          });
+
+          elBoard.appendChild(tile);
+          tileElements[tileVal] = tile;
+        }
+
+        elPeekOverlay.style.backgroundImage = `url("${state.currentImageUrl}")`;
+      }
+
+      function renderPositions() {
+        for (let posIndex = 0; posIndex < 9; posIndex++) {
+          const tileVal = state.board[posIndex];
+          if (tileVal === 8) continue; // 空格不渲染方塊
+          const el = tileElements[tileVal];
+          if (!el) continue;
+
+          const row = Math.floor(posIndex / 3);
+          const col = posIndex % 3;
+          // 使用 translate3d 實現硬體加速平滑滑動
+          el.style.transform = `translate3d(${col * 100}%, ${row * 100}%, 0)`;
+        }
+      }
+
+      function applyImageToTiles(imageUrl, imageName) {
+        state.currentImageUrl = imageUrl;
+        state.currentImageName = imageName;
+        elCurrentImgName.textContent = imageName;
+        elPeekOverlay.style.backgroundImage = `url("${imageUrl}")`;
+
+        for (let tileVal = 0; tileVal < 8; tileVal++) {
+          if (tileElements[tileVal]) {
+            tileElements[tileVal].style.backgroundImage = `url("${imageUrl}")`;
+          }
+        }
+      }
+
+      // ==========================================
+      // 7. 計時器與遊戲流程控制
+      // ==========================================
+      function stopTimer() {
+        if (state.timerInterval) {
+          clearInterval(state.timerInterval);
+          state.timerInterval = null;
+        }
+      }
+
+      function startTimerIfNeeded() {
+        if (state.isPlaying || state.isSolved || state.isFailed) return;
+        state.isPlaying = true;
+
+        state.timerInterval = setInterval(() => {
+          if (state.mode === 'endless') {
+            state.elapsedSeconds++;
+            elTimerDisplay.textContent = formatTime(state.elapsedSeconds);
+          } else {
+            state.remainingSeconds--;
+            state.elapsedSeconds++;
+            elTimerDisplay.textContent = formatTime(state.remainingSeconds);
+
+            if (state.remainingSeconds <= 10 && state.remainingSeconds > 0) {
+              elTimerDisplay.classList.add('timer-urgent');
+            }
+
+            if (state.remainingSeconds <= 0) {
+              handleTimeUp();
+            }
+          }
+        }, 1000);
+      }
+
+      function resetGame() {
+        stopTimer();
+        state.board = generateShuffledBoard();
+        state.moves = 0;
+        state.elapsedSeconds = 0;
+        state.remainingSeconds = state.timeLimit;
+        state.isPlaying = false;
+        state.isSolved = false;
+        state.isFailed = false;
+
+        elMovesDisplay.textContent = '0';
+        elTimerDisplay.classList.remove('timer-urgent');
+
+        if (state.mode === 'endless') {
+          elTimerLabel.textContent = '經過時間';
+          elTimerDisplay.textContent = '00:00';
+          elBestLabel.textContent = '無限最佳';
+        } else {
+          elTimerLabel.textContent = '剩餘時間';
+          elTimerDisplay.textContent = formatTime(state.timeLimit);
+          elBestLabel.textContent = `${state.timeLimit}秒最佳`;
+        }
+
+        updateBestDisplay();
+        renderPositions();
+        hideModal();
+      }
+
+      function tryMoveIndex(index) {
+        if (state.isSolved || state.isFailed) return;
+
+        const emptyIndex = state.board.indexOf(8);
+        const row = Math.floor(index / 3);
+        const col = index % 3;
+        const emptyRow = Math.floor(emptyIndex / 3);
+        const emptyCol = emptyIndex % 3;
+
+        // 曼哈頓距離為 1 代表相鄰
+        const isAdjacent = Math.abs(row - emptyRow) + Math.abs(col - emptyCol) === 1;
+        if (!isAdjacent) return;
+
+        // 第一次移動時啟動計時器
+        startTimerIfNeeded();
+
+        // 交換方塊與空格
+        [state.board[index], state.board[emptyIndex]] = [state.board[emptyIndex], state.board[index]];
+        state.moves++;
+        elMovesDisplay.textContent = String(state.moves);
+
+        sound.playSlide();
+        renderPositions();
+
+        // 檢查是否完成
+        if (isBoardSolved(state.board)) {
+          handleVictory();
+        }
+      }
+
+      function handleVictory() {
+        stopTimer();
+        state.isPlaying = false;
+        state.isSolved = true;
+        elTimerDisplay.classList.remove('timer-urgent');
+        sound.playWin();
+
+        const isNewBest = saveBestRecord(state.elapsedSeconds, state.moves);
+
+        // 短暫延遲讓最後一塊滑動動畫完成後顯示完整原圖與彈窗
+        setTimeout(() => {
+          elPeekOverlay.classList.add('active');
+        }, 220);
+
+        setTimeout(() => {
+          elModalIcon.textContent = '🎉';
+          elModalIcon.className = 'w-16 h-16 mx-auto rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-3xl mb-3 shadow-inner';
+          elModalTitle.textContent = '恭喜完成拼圖！';
+          elModalSubtitle.textContent = state.mode === 'timed'
+            ? `你在限時 ${state.timeLimit} 秒內成功還原了拼圖！`
+            : '太厲害了，所有方塊都已完美歸位！';
+          elModalPreviewImg.src = state.currentImageUrl;
+          elModalTime.textContent = formatTime(state.elapsedSeconds);
+          elModalMoves.textContent = `${state.moves} 步`;
+
+          if (isNewBest) {
+            elModalRecordBadge.classList.remove('hidden');
+          } else {
+            elModalRecordBadge.classList.add('hidden');
+          }
+
+          elModal.classList.remove('hidden');
+        }, 650);
+      }
+
+      function handleTimeUp() {
+        stopTimer();
+        state.isPlaying = false;
+        state.isFailed = true;
+        elTimerDisplay.classList.remove('timer-urgent');
+        sound.playFail();
+
+        elModalIcon.textContent = '⏰';
+        elModalIcon.className = 'w-16 h-16 mx-auto rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center text-3xl mb-3 shadow-inner';
+        elModalTitle.textContent = '時間到！挑戰失敗';
+        elModalSubtitle.textContent = `超過 ${state.timeLimit} 秒限制了，再試一次吧！`;
+        elModalPreviewImg.src = state.currentImageUrl;
+        elModalTime.textContent = formatTime(state.timeLimit);
+        elModalMoves.textContent = `${state.moves} 步`;
+        elModalRecordBadge.classList.add('hidden');
+
+        elModal.classList.remove('hidden');
+      }
+
+      function hideModal() {
+        elModal.classList.add('hidden');
+        if (!state.isSolved) {
+          elPeekOverlay.classList.remove('active');
+        }
+      }
+
+      // ==========================================
+      // 8. 鍵盤方向鍵與觸控滑動手勢支援
+      // ==========================================
+      // 方向鍵邏輯：按「上」代表把空格「下方」的方塊向上推入空格
+      function moveByDirection(dir) {
+        if (state.isSolved || state.isFailed) return;
+        const emptyIndex = state.board.indexOf(8);
+        const emptyRow = Math.floor(emptyIndex / 3);
+        const emptyCol = emptyIndex % 3;
+
+        let targetRow = emptyRow;
+        let targetCol = emptyCol;
+
+        if (dir === 'UP') targetRow = emptyRow + 1;
+        else if (dir === 'DOWN') targetRow = emptyRow - 1;
+        else if (dir === 'LEFT') targetCol = emptyCol + 1;
+        else if (dir === 'RIGHT') targetCol = emptyCol - 1;
+
+        if (targetRow >= 0 && targetRow < 3 && targetCol >= 0 && targetCol < 3) {
+          const targetIndex = targetRow * 3 + targetCol;
+          tryMoveIndex(targetIndex);
+        }
+      }
+
+      window.addEventListener('keydown', (e) => {
+        if (!elModal.classList.contains('hidden')) return;
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+          e.preventDefault();
+          if (e.key === 'ArrowUp') moveByDirection('UP');
+          if (e.key === 'ArrowDown') moveByDirection('DOWN');
+          if (e.key === 'ArrowLeft') moveByDirection('LEFT');
+          if (e.key === 'ArrowRight') moveByDirection('RIGHT');
+        }
+      });
+
+      // 手機觸控滑動手勢
+      let touchStartX = 0;
+      let touchStartY = 0;
+      elBoard.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+          touchStartX = e.touches[0].clientX;
+          touchStartY = e.touches[0].clientY;
+        }
+      }, { passive: true });
+
+      elBoard.addEventListener('touchend', (e) => {
+        if (e.changedTouches.length === 1) {
+          const dx = e.changedTouches[0].clientX - touchStartX;
+          const dy = e.changedTouches[0].clientY - touchStartY;
+          const threshold = 24;
+          if (Math.max(Math.abs(dx), Math.abs(dy)) > threshold) {
+            if (Math.abs(dx) > Math.abs(dy)) {
+              moveByDirection(dx > 0 ? 'RIGHT' : 'LEFT');
+            } else {
+              moveByDirection(dy > 0 ? 'DOWN' : 'UP');
+            }
+          }
+        }
+      }, { passive: true });
+
+      // ==========================================
+      // 9. 自訂圖片上傳與自動正方形置中裁切
+      // ==========================================
+      inputUpload.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+          showToast('請選擇有效的圖片檔案');
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = () => {
+            // 使用 Canvas 自動從圖片正中央裁切為 600x600 正方形，確保拼圖不變形
+            const canvas = document.createElement('canvas');
+            const targetSize = 600;
+            canvas.width = targetSize;
+            canvas.height = targetSize;
+            const ctx = canvas.getContext('2d');
+
+            const minSide = Math.min(img.width, img.height);
+            const sx = (img.width - minSide) / 2;
+            const sy = (img.height - minSide) / 2;
+
+            ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, targetSize, targetSize);
+            const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+
+            // 取消預設縮圖選中框
+            document.querySelectorAll('.preset-thumb').forEach(btn => {
+              btn.classList.remove('border-indigo-600', 'ring-2', 'ring-indigo-200');
+              btn.classList.add('border-transparent');
+            });
+
+            const cleanName = file.name.replace(/\.[^/.]+$/, '').slice(0, 12) || '自訂圖片';
+            applyImageToTiles(croppedDataUrl, `自訂：${cleanName}`);
+            resetGame();
+            showToast('圖片載入成功，已開始新局！');
+          };
+          img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+        // 清空 input 以便重複選取同一張檔案
+        e.target.value = '';
+      });
+
+      // ==========================================
+      // 10. UI 控制項事件綁定
+      // ==========================================
+      // 初始化預設圖片縮圖
+      document.querySelectorAll('.preset-thumb').forEach((btn, idx) => {
+        const preset = presetImages[idx];
+        if (!preset) return;
+        btn.style.backgroundImage = `url("${preset.url}")`;
+        btn.style.backgroundSize = 'cover';
+        btn.style.backgroundPosition = 'center';
+
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.preset-thumb').forEach(b => {
+            b.classList.remove('border-indigo-600', 'ring-2', 'ring-indigo-200');
+            b.classList.add('border-transparent');
+          });
+          btn.classList.remove('border-transparent');
+          btn.classList.add('border-indigo-600', 'ring-2', 'ring-indigo-200');
+
+          applyImageToTiles(preset.url, preset.name);
+          resetGame();
+        });
+      });
+
+      // 切換無限計時模式
+      btnModeEndless.addEventListener('click', () => {
+        if (state.mode === 'endless') return;
+        state.mode = 'endless';
+        btnModeEndless.className = 'py-2 px-3 rounded-xl text-sm font-bold transition-all bg-white text-indigo-600 shadow-sm flex items-center justify-center gap-1.5';
+        btnModeTimed.className = 'py-2 px-3 rounded-xl text-sm font-bold transition-all text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5';
+        elTimedOptions.classList.add('hidden');
+        resetGame();
+      });
+
+      // 切換限時關卡模式
+      btnModeTimed.addEventListener('click', () => {
+        if (state.mode === 'timed') return;
+        state.mode = 'timed';
+        btnModeTimed.className = 'py-2 px-3 rounded-xl text-sm font-bold transition-all bg-white text-amber-600 shadow-sm flex items-center justify-center gap-1.5';
+        btnModeEndless.className = 'py-2 px-3 rounded-xl text-sm font-bold transition-all text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5';
+        elTimedOptions.classList.remove('hidden');
+        resetGame();
+      });
+
+      // 限時秒數預設按鈕 (60 / 90 / 120)
+      document.querySelectorAll('.time-preset').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const sec = parseInt(btn.dataset.seconds, 10);
+          state.timeLimit = sec;
+          document.querySelectorAll('.time-preset').forEach(b => {
+            b.className = 'time-preset px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-amber-800 border border-amber-200 hover:bg-amber-100 transition';
+          });
+          btn.className = 'time-preset px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500 text-white shadow-sm transition';
+          resetGame();
+        });
+      });
+
+      // 數字提示開關
+      btnToggleNumbers.addEventListener('click', () => {
+        state.showNumbers = !state.showNumbers;
+        document.querySelectorAll('.tile-badge').forEach(badge => {
+          badge.style.opacity = state.showNumbers ? '1' : '0';
+        });
+        if (state.showNumbers) {
+          btnToggleNumbers.classList.remove('opacity-60');
+          showToast('已顯示數字提示');
+        } else {
+          btnToggleNumbers.classList.add('opacity-60');
+          showToast('已隱藏數字提示');
+        }
+      });
+
+      // 音效開關
+      btnToggleSound.addEventListener('click', () => {
+        sound.muted = !sound.muted;
+        document.getElementById('icon-sound-on').classList.toggle('hidden', sound.muted);
+        document.getElementById('icon-sound-off').classList.toggle('hidden', !sound.muted);
+        showToast(sound.muted ? '音效已靜音' : '音效已開啟');
+      });
+
+      // 按住查看原圖 (支援滑鼠與觸控長按)
+      const showPeek = (e) => {
+        e.preventDefault();
+        elPeekOverlay.classList.add('active');
+      };
+      const hidePeek = () => {
+        if (!state.isSolved) {
+          elPeekOverlay.classList.remove('active');
+        }
+      };
+      btnPeek.addEventListener('mousedown', showPeek);
+      btnPeek.addEventListener('touchstart', showPeek, { passive: false });
+      window.addEventListener('mouseup', hidePeek);
+      window.addEventListener('touchend', hidePeek);
+      btnPeek.addEventListener('mouseleave', hidePeek);
+
+      // 重新洗牌
+      btnShuffle.addEventListener('click', () => {
+        elPeekOverlay.classList.remove('active');
+        resetGame();
+        showToast('已重新隨機洗牌');
+      });
+
+      // Modal 按鈕
+      btnModalClose.addEventListener('click', hideModal);
+      btnModalAgain.addEventListener('click', () => {
+        elPeekOverlay.classList.remove('active');
+        resetGame();
+      });
+
+      // ==========================================
+      // 11. 啟動遊戲
+      // ==========================================
+      initBoardDOM();
+      resetGame();
+    })();
+  </script>
+</body>
+</html>
