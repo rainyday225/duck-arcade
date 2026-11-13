@@ -1,5 +1,7 @@
 # 🦆 Duck Arcade
 
+測試軟件，主要Vibe coding練習。並不會長期維護此專案。
+
 包含：
 
 - 3x3滑塊拼圖
